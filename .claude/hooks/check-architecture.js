@@ -27,7 +27,7 @@ function getHigherLayers(layer) {
 }
 
 try {
-  const input = JSON.parse(fs.readFileSync('/dev/stdin', 'utf8'));
+  const input = JSON.parse(fs.readFileSync(0, 'utf8'));
   const filePath = (input.tool_input && input.tool_input.file_path) || '';
 
   if (!filePath) {
@@ -78,7 +78,7 @@ try {
 
     if (higherLayers.includes(importedSegment)) {
       const lineNum = i + 1;
-      process.stdout.write(
+      process.stderr.write(
         `BLOCKED: Architecture violation in ${filePath}:${lineNum} — ${currentLayer} cannot import from ${importedSegment}\nFix: Move the import to the correct layer, or extract the shared type to src/types/.\n`
       );
       violated = true;

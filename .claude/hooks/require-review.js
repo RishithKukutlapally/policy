@@ -68,7 +68,7 @@ function lastReviewerTs(transcriptPath) {
 }
 
 try {
-  const input = JSON.parse(fs.readFileSync('/dev/stdin', 'utf8'));
+  const input = JSON.parse(fs.readFileSync(0, 'utf8'));
 
   const scriptDir = path.dirname(path.resolve(__filename));
   const projectDir = findProjectDir(scriptDir) || process.cwd();

@@ -24,7 +24,7 @@ function redact(value) {
 }
 
 try {
-  const input = JSON.parse(fs.readFileSync('/dev/stdin', 'utf8'));
+  const input = JSON.parse(fs.readFileSync(0, 'utf8'));
   const filePath = input.tool_input && input.tool_input.file_path;
 
   if (!filePath) {
@@ -79,7 +79,7 @@ try {
       lines.push(`  - ${label}: ${value}`);
     }
     lines.push('Fix: Move secrets to .env and reference via os.environ.get(). Never hardcode credentials.');
-    process.stdout.write(lines.join('\n') + '\n');
+    process.stderr.write(lines.join('\n') + '\n');
     process.exit(2);
   }
 } catch (_) {

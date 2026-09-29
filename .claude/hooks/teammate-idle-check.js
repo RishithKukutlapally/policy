@@ -7,7 +7,7 @@ const path = require('path');
 
 let input;
 try {
-  input = JSON.parse(fs.readFileSync('/dev/stdin', 'utf8'));
+  input = JSON.parse(fs.readFileSync(0, 'utf8'));
 } catch (_) {
   process.exit(0);
 }
@@ -89,7 +89,7 @@ for (const srcRelPath of uniquePaths) {
 
 if (missingTests.length > 0) {
   for (const file of missingTests) {
-    process.stdout.write(
+    process.stderr.write(
       `Task marked complete but no tests found for ${file}. Write tests before going idle.\nFix: Write tests for ${file} before going idle. Follow TDD: test first, then implement.\n`
     );
   }

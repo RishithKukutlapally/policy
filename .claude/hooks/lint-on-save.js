@@ -7,7 +7,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 try {
-  const input = JSON.parse(fs.readFileSync('/dev/stdin', 'utf8'));
+  const input = JSON.parse(fs.readFileSync(0, 'utf8'));
   const filePath = (input.tool_input && input.tool_input.file_path) || '';
 
   if (!filePath) {
@@ -51,7 +51,7 @@ try {
   if (isPython) {
     const useLinter = linter ? linter === 'ruff' : true; // fallback: use ruff
     if (useLinter) {
-      const result = spawnSync('sh', ['-c', `uv run ruff check --fix "${filePath}" && uv run ruff format "${filePath}"`], {
+      const result = spawnSync(`uv run ruff check --fix "${filePath}" && uv run ruff format "${filePath}"`, { shell: true,
         encoding: 'utf8',
         cwd: detectCwd(filePath),
       });
@@ -62,7 +62,7 @@ try {
   } else if (isTypeScript) {
     const useLinter = linter ? linter === 'eslint' : true; // fallback: use eslint
     if (useLinter) {
-      const result = spawnSync('sh', ['-c', `npx eslint --fix "${filePath}"`], {
+      const result = spawnSync(`npx eslint --fix "${filePath}"`, { shell: true,
         encoding: 'utf8',
         cwd: detectCwd(filePath),
       });

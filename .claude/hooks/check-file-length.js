@@ -35,7 +35,7 @@ function shouldSkip(filePath) {
 }
 
 try {
-  const input = JSON.parse(fs.readFileSync('/dev/stdin', 'utf8'));
+  const input = JSON.parse(fs.readFileSync(0, 'utf8'));
   const filePath = (input.tool_input && input.tool_input.file_path) || '';
 
   if (!filePath) {
@@ -63,7 +63,7 @@ try {
   const lineCount = content.endsWith('\n') ? lines.length - 1 : lines.length;
 
   if (lineCount >= HARD_LIMIT) {
-    process.stdout.write(`BLOCKED: ${filePath} is ${lineCount} lines (hard limit ${HARD_LIMIT}).\nFix: Split by responsibility into separate modules. Re-export from an index file if needed.\n`);
+    process.stderr.write(`BLOCKED: ${filePath} is ${lineCount} lines (hard limit ${HARD_LIMIT}).\nFix: Split by responsibility into separate modules. Re-export from an index file if needed.\n`);
     process.exit(2);
   }
 

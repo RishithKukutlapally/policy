@@ -79,7 +79,7 @@ function checkArchitectureViolations(pyFiles) {
 
 let input;
 try {
-  input = JSON.parse(fs.readFileSync('/dev/stdin', 'utf8'));
+  input = JSON.parse(fs.readFileSync(0, 'utf8'));
 } catch (_) {
   process.exit(0);
 }
@@ -120,11 +120,11 @@ const pyFiles = findPyFiles(srcDir);
 const violations = checkArchitectureViolations(pyFiles);
 
 if (violations.length > 0) {
-  process.stdout.write('BLOCKED: Architecture violations found — fix before committing:\n');
+  process.stderr.write('BLOCKED: Architecture violations found — fix before committing:\n');
   for (const v of violations) {
-    process.stdout.write(`  ${v}\n`);
+    process.stderr.write(`  ${v}\n`);
   }
-  process.stdout.write('Fix: Move imports to the correct layer or extract shared types to src/types/.\n');
+  process.stderr.write('Fix: Move imports to the correct layer or extract shared types to src/types/.\n');
   process.exit(2);
 }
 

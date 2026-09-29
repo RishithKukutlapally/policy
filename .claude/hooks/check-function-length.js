@@ -111,7 +111,7 @@ function checkBraceLang(lines, filePath) {
 }
 
 try {
-  const input = JSON.parse(fs.readFileSync('/dev/stdin', 'utf8'));
+  const input = JSON.parse(fs.readFileSync(0, 'utf8'));
   const filePath = (input.tool_input && input.tool_input.file_path) || '';
 
   if (!filePath) {
@@ -140,7 +140,7 @@ try {
   for (const f of findings) {
     const label = f.level === 'block' ? 'BLOCKED' : 'WARNING';
     const limit = f.level === 'block' ? HARD_LIMIT : WARN_LINES;
-    process.stdout.write(
+    process.stderr.write(
       `${label}: Function ${f.name} in ${f.filePath}:${f.startLine + 1} is ${f.length} lines (limit ${limit}).\nFix: Decompose into named sub-functions. Each should be testable in isolation.\n`
     );
     if (f.level === 'block') hasBlock = true;

@@ -42,7 +42,7 @@ function simulateEdit(filePath, oldStr, newStr, replaceAll) {
 }
 
 try {
-  const input = JSON.parse(fs.readFileSync('/dev/stdin', 'utf8'));
+  const input = JSON.parse(fs.readFileSync(0, 'utf8'));
   const toolName = input.tool_name || '';
   const ti = input.tool_input || {};
   const filePath = ti.file_path || '';
@@ -71,7 +71,7 @@ try {
   const count = countLines(finalContent);
 
   if (count > HARD_LIMIT) {
-    process.stdout.write(
+    process.stderr.write(
       `BLOCKED: ${toolName} on ${filePath} would produce ${count} lines (hard limit ${HARD_LIMIT}).\n` +
         `Fix: Split the file into modules by responsibility BEFORE writing. One file, one responsibility (SRP).\n` +
         `Create separate files for each concern and re-export from an index if needed.\n`

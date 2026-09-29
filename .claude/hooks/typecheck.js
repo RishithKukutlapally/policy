@@ -7,7 +7,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 try {
-  const input = JSON.parse(fs.readFileSync('/dev/stdin', 'utf8'));
+  const input = JSON.parse(fs.readFileSync(0, 'utf8'));
   const filePath = (input.tool_input && input.tool_input.file_path) || '';
 
   if (!filePath) {
@@ -53,7 +53,7 @@ try {
   if (isPython) {
     const useChecker = typechecker ? typechecker === 'mypy' : true; // fallback: use mypy
     if (useChecker) {
-      const result = spawnSync('sh', ['-c', `uv run mypy "${filePath}"`], {
+      const result = spawnSync(`uv run mypy "${filePath}"`, { shell: true,
         encoding: 'utf8',
         cwd,
       });
@@ -65,13 +65,13 @@ try {
   } else if (isTypeScript) {
     const useChecker = typechecker ? typechecker === 'tsc' : true; // fallback: use tsc
     if (useChecker) {
-      const result = spawnSync('sh', ['-c', `npx tsc --noEmit --pretty "${filePath}"`], {
+      const result = spawnSync(`npx tsc --noEmit --pretty "${filePath}"`, { shell: true,
         encoding: 'utf8',
         cwd,
       });
       if (result.status !== 0) {
         // tsc --noEmit with a file arg may not work on all setups; fall back to project-wide
-        const fallback = spawnSync('sh', ['-c', 'npx tsc --noEmit'], {
+        const fallback = spawnSync('npx tsc --noEmit', { shell: true,
           encoding: 'utf8',
           cwd,
         });

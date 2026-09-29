@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 try {
-  const input = JSON.parse(fs.readFileSync('/dev/stdin', 'utf8'));
+  const input = JSON.parse(fs.readFileSync(0, 'utf8'));
   const filePath = input.tool_input && input.tool_input.file_path;
 
   if (!filePath) {
@@ -22,7 +22,7 @@ try {
   const envPattern = /^\.env(\..+)?$/;
 
   if (envPattern.test(filename)) {
-    process.stdout.write(
+    process.stderr.write(
       `BLOCKED: Cannot modify ${filename} — environment files contain real secrets. Edit manually.\nFix: Edit .env.example instead for documentation, or edit .env manually outside Claude.\n`
     );
     process.exit(2);
