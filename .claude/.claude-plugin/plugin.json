@@ -1,0 +1,9 @@
+{
+  "name": "claude-harness-engine",
+  "version": "1.0.0",
+  "description": "GAN-inspired harness for autonomous long-running application development with Karpathy ratcheting, agent teams, and layered evaluation.",
+  "author": {
+    "name": "claude-harness-engine"
+  },
+  "homepage": "https://github.com/cwijayasundara/claude_harness_eng_v1"
+}

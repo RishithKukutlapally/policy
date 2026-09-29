@@ -1,0 +1,66 @@
+{
+  "name": "policyforge",
+  "description": "PolicyForge, a policy issuance and lifecycle management platform for Horizon Insurance covering Term Life, Motor and Household: quote, application, underwriting, issuance, endorsement, renewal and cancellation, with versioned policy rule sets",
+  "stack": {
+    "backend": {
+      "language": "python",
+      "version": "3.12",
+      "framework": "fastapi",
+      "package_manager": "uv",
+      "linter": "ruff",
+      "typechecker": "mypy",
+      "test_runner": "pytest"
+    },
+    "frontend": {
+      "language": "typescript",
+      "framework": "react",
+      "bundler": "vite",
+      "package_manager": "npm",
+      "linter": "eslint",
+      "typechecker": "tsc",
+      "test_runner": "vitest"
+    },
+    "database": {
+      "primary": "sqlite",
+      "secondary": null
+    },
+    "deployment": {
+      "method": "local",
+      "services": ["backend", "frontend"]
+    }
+  },
+  "layers": [
+    { "name": "types", "path": "backend/src/types", "rank": 1 },
+    { "name": "domain", "path": "backend/src/domain", "rank": 2 },
+    { "name": "config", "path": "backend/src/config", "rank": 3 },
+    { "name": "repository", "path": "backend/src/repository", "rank": 4 },
+    { "name": "service", "path": "backend/src/service", "rank": 5 },
+    { "name": "api", "path": "backend/src/api", "rank": 6 }
+  ],
+  "evaluation": {
+    "api_base_url": "http://localhost:8000",
+    "ui_base_url": "http://localhost:3000",
+    "health_check": "http://localhost:8000/health",
+    "design_score_threshold": 7,
+    "design_max_iterations": 10,
+    "test_corpus_dir": "specs/test_artefacts"
+  },
+  "execution": {
+    "default_mode": "full",
+    "max_self_heal_attempts": 3,
+    "max_auto_iterations": 50,
+    "coverage_threshold": 80,
+    "session_chaining": true,
+    "agent_team_size": "auto",
+    "teammate_model": "sonnet"
+  },
+  "verification": {
+    "mode": "local",
+    "health_check": { "url": "http://localhost:8000/health", "retries": 5, "backoff_seconds": 2 },
+    "local": {
+      "backend_url": "http://localhost:8000",
+      "frontend_url": "http://localhost:3000",
+      "start_commands": []
+    }
+  }
+}
