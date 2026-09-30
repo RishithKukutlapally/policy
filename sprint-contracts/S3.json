@@ -1,0 +1,120 @@
+{
+  "group": "S3",
+  "stories": ["E5-S1", "E5-S2", "E5-S3", "E6-S1", "E6-S2", "E6-S3"],
+  "features": [
+    "F095", "F096", "F097", "F098", "F099", "F100", "F101", "F102", "F103", "F104",
+    "F105", "F106", "F107", "F108", "F109", "F110", "F111", "F112", "F113", "F114",
+    "F115", "F116", "F117", "F118", "F119", "F120", "F121", "F122", "F123", "F124"
+  ],
+  "contract": {
+    "api_checks": [
+      {
+        "id": "S3-API-01",
+        "method": "POST",
+        "path": "/api/applications/{{auto_bind_application_id}}/issue",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "expected_status": 201,
+        "expected_body": { "status": "ACTIVE" },
+        "description": "AC-05 — issuance assigns a unique policy number, effective date, sum insured and premium, and starts ACTIVE"
+      },
+      {
+        "id": "S3-API-02",
+        "method": "POST",
+        "path": "/api/applications/{{manual_review_application_id}}/issue",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "expected_status": 409,
+        "expected_body": { "error": { "code": "INVALID_APPLICATION_STATE" } },
+        "description": "AC-05 — only an AUTO_BIND application can be issued; nothing is persisted otherwise"
+      },
+      {
+        "id": "S3-API-03",
+        "method": "GET",
+        "path": "/api/policies",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "expected_status": 200,
+        "description": "AC-15 — a customer sees only their own policies with premium due date and status"
+      },
+      {
+        "id": "S3-API-04",
+        "method": "GET",
+        "path": "/api/policies/{{policy_number}}",
+        "headers": { "X-Actor-Id": "cust-002", "X-Actor-Role": "CUSTOMER" },
+        "expected_status": 404,
+        "expected_body": { "error": { "code": "NOT_FOUND" } },
+        "description": "AC-15 / AC-22 — another customer's policy is not disclosed"
+      },
+      {
+        "id": "S3-API-05",
+        "method": "POST",
+        "path": "/api/policies/{{policy_number}}/endorsements",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "body": { "type": "CHANGE_SUM_INSURED", "new_sum_insured": "600000.00" },
+        "expected_status": 201,
+        "description": "AC-06 / AC-16 — endorsement creates an immutable record, updates the policy atomically and moves it to ENDORSED"
+      },
+      {
+        "id": "S3-API-06",
+        "method": "POST",
+        "path": "/api/policies/{{policy_number}}/endorsements?preview=true",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "body": { "type": "CHANGE_SUM_INSURED", "new_sum_insured": "700000.00" },
+        "expected_status": 200,
+        "description": "AC-16 — preview returns the pro-rated premium delta and persists nothing"
+      },
+      {
+        "id": "S3-API-07",
+        "method": "POST",
+        "path": "/api/policies/{{cancelled_policy_number}}/endorsements",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "body": { "type": "CHANGE_ADDRESS", "address": "2 Sample Street, Testville" },
+        "expected_status": 409,
+        "expected_body": { "error": { "code": "INVALID_POLICY_STATE" } },
+        "description": "AC-10 — endorsing a terminal policy raises InvalidPolicyStateException and changes nothing"
+      }
+    ],
+    "playwright_checks": [
+      {
+        "id": "S3-UI-01",
+        "description": "AC-15 — My Policies lists the customer's policies with status and premium due date",
+        "url": "http://localhost:3000/policies",
+        "steps": [
+          { "action": "goto", "value": "http://localhost:3000/policies" },
+          { "action": "expect_visible", "selector": "[data-testid='policy-list']" },
+          { "action": "click", "selector": "[data-testid='policy-open']" },
+          { "action": "expect_visible", "selector": "[data-testid='policy-detail']", "assertion": "detail shows lifecycle status and endorsement history" }
+        ]
+      },
+      {
+        "id": "S3-UI-02",
+        "description": "AC-06 / AC-16 — Endorse previews the premium delta then applies the change",
+        "url": "http://localhost:3000/policies",
+        "steps": [
+          { "action": "goto", "value": "http://localhost:3000/policies" },
+          { "action": "click", "selector": "[data-testid='policy-endorse']" },
+          { "action": "select", "selector": "[data-testid='endorsement-type']", "value": "CHANGE_SUM_INSURED" },
+          { "action": "fill", "selector": "[data-testid='endorsement-sum-insured']", "value": "600000" },
+          { "action": "click", "selector": "[data-testid='endorsement-preview']" },
+          { "action": "expect_visible", "selector": "[data-testid='endorsement-delta']", "assertion": "pro-rated delta shown before submitting" }
+        ]
+      }
+    ],
+    "design_checks": {
+      "visual_hierarchy": { "required": true, "min_score": 6 },
+      "accessibility": { "required": true, "min_score": 6 },
+      "responsiveness": { "required": true, "min_score": 6 },
+      "interaction_feedback": { "required": false, "min_score": 4 }
+    },
+    "performance_checks": [
+      { "endpoint": "/api/policies", "method": "GET", "max_response_time_ms": 2000 }
+    ],
+    "architecture_checks": {
+      "layering": { "required": true, "description": "import-linter contracts KEPT; policy_state_machine and endorsement_rules stay pure domain" },
+      "typing": { "required": true, "description": "mypy strict clean; zero any in the new frontend code" },
+      "folder_structure": { "required": true, "description": "matches specs/design/component-map.md rows for E5-* and E6-*" },
+      "env_vars": { "required": true, "description": "no new secrets; dates only through the business_date setting and src/lib/clock.py" },
+      "migrations": { "required": true, "description": "single Alembic head; the lifecycle tables (policies, policy_state_transitions, endorsements, premium_payments, refunds) arrive in one append-only revision" }
+    }
+  },
+  "approved": true,
+  "notes": "Sprint 3 of 4. Delivers policy issuance with unique numbering (AC-05), the enforced lifecycle state machine (AC-10), customer policy views with endorsement history (AC-15), and endorsements that are immutable, atomic and correctly pro-rated (AC-06, AC-16). Endorsements, state transitions and payments are append-only (NFR-02); every amount is Decimal quantized once (NFR-01); admin actions are audited (NFR-04). TDD: failing test before implementation for every story."
+}
