@@ -1,0 +1,14 @@
+/* Run end-of-day (story E7-S4) — layout only; shared tokens in components/lifecycle/lifecycle.css. */
+.eod-page {
+  min-width: 0;
+}
+.eod-date {
+  min-width: 12rem;
+}
+.eod-list {
+  margin: 0 0 0.75rem;
+  padding-left: 1.2rem;
+}
+.eod-list li {
+  margin-bottom: 0.3rem;
+}

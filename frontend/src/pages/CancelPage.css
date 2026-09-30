@@ -1,0 +1,16 @@
+/* Cancel (story E8-S3) — layout only; shared tokens in components/lifecycle/lifecycle.css. */
+.cancel-page,
+.cancel-done {
+  min-width: 0;
+}
+.cancel-page h1,
+.cancel-done h1 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.cancel-preview {
+  margin: 1rem 0 0;
+  background: var(--surface-2, #f0f2f5);
+}

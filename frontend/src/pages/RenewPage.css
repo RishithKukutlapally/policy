@@ -1,0 +1,13 @@
+/* Renew (story E7-S4) — layout only; shared tokens live in components/lifecycle/lifecycle.css. */
+.renew-page {
+  min-width: 0;
+}
+.renew-page h1 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.renew-page h3 {
+  margin-top: 1rem;
+}
