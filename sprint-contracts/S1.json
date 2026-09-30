@@ -1,0 +1,140 @@
+{
+  "group": "S1",
+  "stories": ["E1-S1", "E2-S1", "E1-S2", "E1-S3", "E1-S4", "E2-S2", "E1-S5", "E2-S3", "E2-S4"],
+  "features": [
+    "F001", "F002", "F003", "F004", "F005", "F006", "F007", "F008", "F009", "F010",
+    "F011", "F012", "F013", "F014", "F015", "F016", "F017", "F018", "F019", "F020",
+    "F021", "F022", "F023", "F024", "F025", "F026", "F027", "F028", "F029", "F030",
+    "F031", "F032", "F033", "F034", "F035", "F036", "F037", "F038", "F039", "F040",
+    "F041", "F042", "F043", "F044", "F045", "F046", "F047"
+  ],
+  "contract": {
+    "api_checks": [
+      {
+        "id": "S1-API-01",
+        "method": "GET",
+        "path": "/health",
+        "expected_status": 200,
+        "expected_body": { "status": "ok" },
+        "description": "AC-21 — health endpoint answers without auth"
+      },
+      {
+        "id": "S1-API-02",
+        "method": "GET",
+        "path": "/api/products",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "expected_status": 200,
+        "description": "AC-02 — catalog lists TERM_LIFE, MOTOR and HOUSEHOLD, each with an active PUBLISHED version"
+      },
+      {
+        "id": "S1-API-03",
+        "method": "GET",
+        "path": "/api/products",
+        "expected_status": 401,
+        "description": "AC-22 — missing actor headers are rejected at the controller layer"
+      },
+      {
+        "id": "S1-API-04",
+        "method": "POST",
+        "path": "/api/products/MOTOR/versions",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "body": {},
+        "expected_status": 403,
+        "description": "AC-22 — non-admin cannot create a rule-set version"
+      },
+      {
+        "id": "S1-API-05",
+        "method": "GET",
+        "path": "/api/products/MOTOR/versions",
+        "headers": { "X-Actor-Id": "admin-001", "X-Actor-Role": "ADMIN" },
+        "expected_status": 200,
+        "description": "AC-02 / AC-11 — version history for a product"
+      },
+      {
+        "id": "S1-API-06",
+        "method": "POST",
+        "path": "/api/products/MOTOR/versions/1/publish",
+        "headers": { "X-Actor-Id": "admin-001", "X-Actor-Role": "ADMIN" },
+        "expected_status": 409,
+        "expected_body": { "error": { "code": "VERSION_IMMUTABLE" } },
+        "description": "AC-11 — an already PUBLISHED version cannot be republished or changed"
+      },
+      {
+        "id": "S1-API-07",
+        "method": "GET",
+        "path": "/api/products/UNKNOWN/versions",
+        "headers": { "X-Actor-Id": "admin-001", "X-Actor-Role": "ADMIN" },
+        "expected_status": 404,
+        "expected_body": { "error": { "code": "NOT_FOUND" } },
+        "description": "Unknown product returns the canonical error envelope"
+      }
+    ],
+    "playwright_checks": [
+      {
+        "id": "S1-UI-01",
+        "description": "AC-24 — app shell renders and the role switcher changes the active role",
+        "url": "http://localhost:3000/",
+        "steps": [
+          { "action": "goto", "value": "http://localhost:3000/" },
+          { "action": "expect_visible", "selector": "[data-testid='role-switcher']" },
+          { "action": "select", "selector": "[data-testid='role-switcher']", "value": "ADMIN" },
+          { "action": "expect_visible", "selector": "[data-testid='nav-catalog']", "assertion": "admin navigation appears" }
+        ]
+      },
+      {
+        "id": "S1-UI-02",
+        "description": "AC-02 / AC-11 — Product Catalog Manager lists three products and their active versions",
+        "url": "http://localhost:3000/admin/catalog",
+        "steps": [
+          { "action": "goto", "value": "http://localhost:3000/admin/catalog" },
+          { "action": "expect_visible", "selector": "[data-testid='product-row-TERM_LIFE']" },
+          { "action": "expect_visible", "selector": "[data-testid='product-row-MOTOR']" },
+          { "action": "expect_visible", "selector": "[data-testid='product-row-HOUSEHOLD']", "assertion": "three products with distinct rule sets" }
+        ]
+      },
+      {
+        "id": "S1-UI-03",
+        "description": "AC-24 — responsive layout: at 390px the side nav collapses behind the 'Open navigation' control",
+        "url": "http://localhost:3000/",
+        "steps": [
+          { "action": "resize", "value": "390x844" },
+          { "action": "goto", "value": "http://localhost:3000/" },
+          { "action": "expect_visible", "selector": "[data-testid='nav-toggle']", "assertion": "menu button visible on mobile" }
+        ]
+      }
+    ],
+    "design_checks": {
+      "visual_hierarchy": { "required": true, "min_score": 6 },
+      "accessibility": { "required": true, "min_score": 6 },
+      "responsiveness": { "required": true, "min_score": 6 },
+      "interaction_feedback": { "required": false, "min_score": 4 }
+    },
+    "performance_checks": [
+      { "endpoint": "/health", "method": "GET", "max_response_time_ms": 1000 }
+    ],
+    "architecture_checks": {
+      "layering": {
+        "required": true,
+        "description": "import-linter contracts KEPT: types -> domain -> config -> repository -> service -> api; api must not import repository or domain; lib is stdlib-only; types and domain import no framework and no logging (docs/conventions.md 'Layer import rules')"
+      },
+      "typing": {
+        "required": true,
+        "description": "uv run mypy src/ clean under strict settings; zero 'any' in frontend TypeScript"
+      },
+      "folder_structure": {
+        "required": true,
+        "description": "matches specs/design/folder-structure.md and the module table in docs/conventions.md"
+      },
+      "env_vars": {
+        "required": true,
+        "description": "settings from src/config/settings.py only (database_url, api_port, ui_port, business_date); no secrets committed; .env is git-ignored"
+      },
+      "migrations": {
+        "required": true,
+        "description": "single Alembic head; 0001 baseline (E1-S1), 0002 audit_records (E1-S3), 0003 rule_set_versions (E2-S2); append-only, no edits to committed revisions (NFR-05)"
+      }
+    }
+  },
+  "approved": true,
+  "notes": "Sprint 1 of 4 (see specs/stories/dependency-graph.md). Delivers the platform foundation (AC-21 health, AC-22 auth boundary, AC-23 JSON logs + correlation id, AC-24 responsive shell, NFR-02..NFR-08 scaffolding) and the product catalog with versioned, immutable rule sets (AC-02, AC-11). TDD is mandatory: the failing test commit precedes the implementation commit for every story (docs/commit-plan.md records the order)."
+}
