@@ -1,0 +1,22 @@
+/* Endorse (story E6-S3) — layout only; the shared lifecycle tokens live in
+   components/lifecycle/lifecycle.css and the design tokens in styles/index.css. */
+.endorse-page,
+.endorse-done {
+  min-width: 0;
+}
+.endorse-page h1,
+.endorse-done h1 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.endorse-type {
+  margin-bottom: 1rem;
+}
+.endorse-page .route {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}

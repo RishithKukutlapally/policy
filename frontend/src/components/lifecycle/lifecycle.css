@@ -1,0 +1,149 @@
+/* Lifecycle screens (stories E6-S3, E7-S4, E8-S3, E9-S2) — Endorse, Renew, end-of-day, Cancel and the
+   admin Portfolio dashboard. Layout only, built from the shared tokens in styles/index.css, which these
+   stories never edit. Mobile-first: one column, widening to two at the 768 px breakpoint. */
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+@media (min-width: 768px) {
+  .grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.9rem 1rem;
+}
+@media (min-width: 768px) {
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.form-grid .field--full {
+  grid-column: 1 / -1;
+}
+
+/* form controls: match the tokens the other screens use */
+.lc-input,
+.lc-select,
+.lc-textarea {
+  font: inherit;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border-strong, #aeb6c1);
+  border-radius: var(--radius, 6px);
+  background: #fff;
+  color: var(--text, #1b2330);
+  width: 100%;
+  min-width: 0;
+}
+.lc-textarea {
+  resize: vertical;
+}
+.lc-input[aria-invalid='true'],
+.lc-select[aria-invalid='true'],
+.lc-textarea[aria-invalid='true'] {
+  border: 2px solid var(--danger, #9b1c1c);
+}
+.field-error {
+  color: var(--danger, #9b1c1c);
+  font-size: 0.84rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+.btn-danger {
+  background: var(--danger, #9b1c1c);
+  border-color: var(--danger, #9b1c1c);
+  color: #fff;
+}
+
+/* big single figures: the premium delta, the renewal premium, the refund line */
+.lc-figure {
+  font-size: 1.9rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin: 0.2rem 0;
+}
+.lc-delta {
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin: 0.2rem 0;
+}
+.lc-preview {
+  border: 1px solid var(--border, #d5dae1);
+  border-radius: var(--radius, 6px);
+  background: var(--surface-2, #f0f2f5);
+  padding: 0.7rem 0.8rem;
+  margin-top: 0.6rem;
+}
+.refund-line {
+  font-weight: 650;
+  font-size: 1.02rem;
+  margin: 0 0 0.6rem;
+}
+
+/* summary tiles: counts on the end-of-day result, cards on the dashboard */
+.lc-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+@media (max-width: 767.98px) {
+  .lc-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.lc-stat {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #d5dae1);
+  border-radius: var(--radius, 6px);
+  padding: 0.7rem 0.8rem;
+}
+.lc-stat .lbl {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted, #4f5967);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.lc-stat .val {
+  margin: 0.2rem 0 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.lc-stat .sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted, #4f5967);
+}
+
+/* "As of" toolbar in a page head */
+.lc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: flex-end;
+}
+
+.lc-loading {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  color: var(--muted, #4f5967);
+  padding: 0.6rem 0;
+}

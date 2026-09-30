@@ -1,0 +1,30 @@
+/* Policy Detail (story E5-S3) — layout only, built from the shared tokens in styles/index.css. */
+.policy-detail {
+  min-width: 0;
+}
+.policy-detail h1 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.detail-actions .btn[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+@media (max-width: 767.98px) {
+  .detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

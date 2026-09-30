@@ -1,0 +1,15 @@
+/* My Policies (story E5-S3) — layout only, built from the shared tokens in styles/index.css. */
+.policies-page {
+  min-width: 0;
+}
+.policies-issue {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+.policies-hint {
+  margin-top: 0.5rem;
+}
+.policies-page .empty p {
+  margin-bottom: 0.75rem;
+}

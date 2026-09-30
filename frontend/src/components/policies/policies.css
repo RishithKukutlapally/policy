@@ -1,0 +1,115 @@
+/* Policy views (story E5-S3) — status badges, stacked cards and the lifecycle timeline.
+   Built from the shared tokens in styles/index.css, which this story never edits. */
+
+/* Status badges: text plus a shape modifier on the dot — never colour alone (AC-24). */
+.badge.b-ACTIVE {
+  background: var(--ok-soft, #e5f3ea);
+  color: var(--ok, #1d5b34);
+  border-color: #8fc4a1;
+}
+.badge.b-ENDORSED {
+  background: var(--accent-soft, #e7eef8);
+  color: var(--accent, #1d4f8f);
+  border-color: #98b5dc;
+}
+.badge.b-LAPSED {
+  background: var(--warn-soft, #fff3dc);
+  color: var(--warn, #734700);
+  border-color: #d9b36a;
+}
+.badge.b-LAPSED::before {
+  border-radius: 0;
+  transform: rotate(45deg);
+}
+.badge.b-CANCELLED {
+  background: var(--danger-soft, #fbeaea);
+  color: var(--danger, #9b1c1c);
+  border-color: #dc9c9c;
+}
+.badge.b-CANCELLED::before {
+  border-radius: 1px;
+}
+.badge.b-RENEWED {
+  background: #efeaf9;
+  color: #4a2d86;
+  border-color: #b7a6dc;
+}
+.badge.b-PAID {
+  background: var(--ok-soft, #e5f3ea);
+  color: var(--ok, #1d5b34);
+  border-color: #8fc4a1;
+}
+.badge.b-UNPAID {
+  background: var(--warn-soft, #fff3dc);
+  color: var(--warn, #734700);
+  border-color: #d9b36a;
+}
+.badge.b-UNPAID::before {
+  border-radius: 0;
+  transform: rotate(45deg);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Stacked cards below the 768 px breakpoint. */
+.policy-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+.policy-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #d5dae1);
+  border-radius: var(--radius, 6px);
+  padding: 0.7rem 0.8rem;
+}
+.policy-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+.policy-card-actions {
+  margin-top: 0.6rem;
+}
+.policy-open {
+  font-weight: 700;
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 0.9rem;
+  border-left: 2px solid var(--border, #d5dae1);
+}
+.timeline li {
+  position: relative;
+  padding: 0 0 0.8rem 0.6rem;
+}
+.timeline li::before {
+  content: '';
+  position: absolute;
+  left: -1.28rem;
+  top: 0.35rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--surface, #fff);
+  border: 2px solid var(--accent, #1d4f8f);
+}
+.timeline-arrow {
+  margin: 0 0.3rem;
+}
+.before-after {
+  font-size: 0.86rem;
+}
+.section-gap {
+  margin-top: 1.25rem;
+}
