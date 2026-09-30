@@ -1,0 +1,63 @@
+{
+  "name": "policyforge-substrate",
+  "version": "1.0.0",
+  "description": "PolicyForge policy-administration substrate for Claude Code: domain agents (quote engine, underwriting, endorsement, renewal), technical agents (policy-version validator, arch-test author, migration coherence, reviewers), skills, slash commands, NFR guard hooks and Playwright MCP — layered on the claude-harness-engine v1 foundation.",
+  "author": {
+    "name": "Rishith Kukutlapally",
+    "email": "krishith@virtusa.com"
+  },
+  "license": "MIT",
+  "keywords": ["insurance", "policy-administration", "claude-code", "harness", "ai-native"],
+  "dependencies": {
+    "claude-harness-engine": "1.0.0"
+  },
+  "agents": [
+    "./.claude/agents/quote-engine-agent.md",
+    "./.claude/agents/underwriting-agent.md",
+    "./.claude/agents/endorsement-agent.md",
+    "./.claude/agents/renewal-orchestrator-agent.md",
+    "./.claude/agents/policy-version-validator-agent.md",
+    "./.claude/agents/archtest-author-agent.md",
+    "./.claude/agents/migration-coherence-agent.md",
+    "./.claude/agents/clean-code-reviewer.md",
+    "./.claude/agents/janitor.md",
+    "./.claude/agents/performance-auditor.md",
+    "./.claude/agents/doc-writer.md"
+  ],
+  "skills": [
+    "./.claude/skills/premium-calc-evaluator",
+    "./.claude/skills/policy-state-machine-generator",
+    "./.claude/skills/endorsement-validator",
+    "./.claude/skills/policy-version-validator",
+    "./.claude/skills/spec-to-test-generator",
+    "./.claude/skills/archtest-author"
+  ],
+  "commands": [
+    "./.claude/commands/quote-check.md",
+    "./.claude/commands/ac-coverage.md",
+    "./.claude/commands/publish-policy-version.md",
+    "./.claude/commands/sprint-close.md",
+    "./.claude/commands/record-fix-loop.md",
+    "./.claude/commands/knowledge-deposit.md"
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/.claude/hooks/premium-precision-check.js\"" },
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/.claude/hooks/policy-immutability-check.js\"" },
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/.claude/hooks/pii-redaction-check.js\"" },
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/.claude/hooks/append-only-repository-check.js\"" }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/.claude/hooks/shell-immutability-check.js\"" }
+        ]
+      }
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}

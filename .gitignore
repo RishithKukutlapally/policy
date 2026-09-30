@@ -6,11 +6,25 @@ __pycache__/
 *.pyc
 .coverage
 htmlcov/
-dist/
-build/
+# Build output only at the project roots — a bare `build/`/`dist/` also matched
+# `.claude/skills/build/`, silently excluding a harness skill from the repository.
+/dist/
+/build/
+backend/dist/
+backend/build/
+frontend/dist/
+frontend/build/
 .venv/
 *.egg-info/
 .mypy_cache/
 .ruff_cache/
 playwright-report/
 test-results/
+
+# PolicyForge: local-only state and databases
+*.db
+.claude/state/pending-reviews.jsonl
+.claude/state/process-*.log
+.claude/settings.local.json
+.env.*
+!.env.example
