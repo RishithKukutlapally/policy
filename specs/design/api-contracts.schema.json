@@ -1,0 +1,5548 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "PolicyForge API",
+    "version": "1.0.0",
+    "description": "Machine-readable twin of specs/design/api-contracts.md (26 endpoints; supersedes the docs/conventions.md endpoint table for paths). Money is always a two-decimal JSON string. Every response carries X-Correlation-ID. Error envelope: {\"error\": {\"code\", \"message\", \"details\"}}."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Local dev (npm start)"
+    }
+  ],
+  "tags": [
+    {
+      "name": "health"
+    },
+    {
+      "name": "catalog"
+    },
+    {
+      "name": "quotes"
+    },
+    {
+      "name": "applications"
+    },
+    {
+      "name": "underwriting"
+    },
+    {
+      "name": "policies"
+    },
+    {
+      "name": "endorsements"
+    },
+    {
+      "name": "renewals"
+    },
+    {
+      "name": "cancellations"
+    },
+    {
+      "name": "admin"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "tags": [
+          "health"
+        ],
+        "summary": "GET /health",
+        "description": "Roles: public. Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "public",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                },
+                "example": {
+                  "status": "ok"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/products": {
+      "get": {
+        "operationId": "listProducts",
+        "tags": [
+          "catalog"
+        ],
+        "summary": "GET /api/products",
+        "description": "Roles: CUSTOMER, UNDERWRITER, ADMIN. Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "CUSTOMER, UNDERWRITER, ADMIN",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Product"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ]
+      }
+    },
+    "/api/products/{product}/versions": {
+      "get": {
+        "operationId": "listProductVersions",
+        "tags": [
+          "catalog"
+        ],
+        "summary": "GET /api/products/{product}/versions",
+        "description": "Roles: CUSTOMER, UNDERWRITER, ADMIN. Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "CUSTOMER, UNDERWRITER, ADMIN",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Product"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RuleVersion"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createDraftVersion",
+        "tags": [
+          "catalog"
+        ],
+        "summary": "POST /api/products/{product}/versions",
+        "description": "Roles: ADMIN. Audit: RULE_VERSION_DRAFT_CREATED. See specs/design/api-contracts.md.",
+        "x-roles": "ADMIN",
+        "x-audit-action": "RULE_VERSION_DRAFT_CREATED",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Product"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleVersionRef"
+                },
+                "example": {
+                  "product": "MOTOR",
+                  "version": 2,
+                  "status": "DRAFT"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DRAFT_ALREADY_OPEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleFile"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/products/{product}/versions/{version}": {
+      "put": {
+        "operationId": "replaceDraftVersion",
+        "tags": [
+          "catalog"
+        ],
+        "summary": "PUT /api/products/{product}/versions/{version}",
+        "description": "Roles: ADMIN. Audit: none defined in conventions (OI-1; proposed RULE_VERSION_DRAFT_REPLACED). See specs/design/api-contracts.md.",
+        "x-roles": "ADMIN",
+        "x-audit-action": "none defined in conventions (OI-1; proposed RULE_VERSION_DRAFT_REPLACED)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Product"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleVersionRef"
+                },
+                "example": {
+                  "product": "MOTOR",
+                  "version": 2,
+                  "status": "DRAFT"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "VERSION_IMMUTABLE",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleFile"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/products/{product}/versions/{version}/publish": {
+      "post": {
+        "operationId": "publishVersion",
+        "tags": [
+          "catalog"
+        ],
+        "summary": "POST /api/products/{product}/versions/{version}/publish",
+        "description": "Roles: ADMIN. Audit: RULE_VERSION_PUBLISHED. See specs/design/api-contracts.md.",
+        "x-roles": "ADMIN",
+        "x-audit-action": "RULE_VERSION_PUBLISHED",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Product"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishedVersion"
+                },
+                "example": {
+                  "product": "MOTOR",
+                  "version": 2,
+                  "status": "PUBLISHED",
+                  "is_active": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "VERSION_IMMUTABLE",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ]
+      }
+    },
+    "/api/quotes": {
+      "post": {
+        "operationId": "createQuote",
+        "tags": [
+          "quotes"
+        ],
+        "summary": "POST /api/quotes",
+        "description": "Roles: CUSTOMER. Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "CUSTOMER",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteCreated"
+                },
+                "example": {
+                  "quote_id": "3f1c9a2e-8d4b-4c1e-9a7f-2b6d5e8c1a04",
+                  "product": "MOTOR",
+                  "rule_version": 1,
+                  "sum_insured": "500000.00",
+                  "premium": "14322.00",
+                  "currency": "INR",
+                  "created_at": "2026-10-01T09:30:00Z"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "NO_PUBLISHED_VERSION",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/quotes/{quote_id}": {
+      "get": {
+        "operationId": "getQuote",
+        "tags": [
+          "quotes"
+        ],
+        "summary": "GET /api/quotes/{quote_id}",
+        "description": "Roles: CUSTOMER (owner), UNDERWRITER, ADMIN. Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "CUSTOMER (owner), UNDERWRITER, ADMIN",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/QuoteId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ]
+      }
+    },
+    "/api/quotes/{quote_id}/reprice": {
+      "get": {
+        "operationId": "repriceQuote",
+        "tags": [
+          "quotes"
+        ],
+        "summary": "GET /api/quotes/{quote_id}/reprice",
+        "description": "Roles: CUSTOMER (owner), UNDERWRITER, ADMIN. Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "CUSTOMER (owner), UNDERWRITER, ADMIN",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/QuoteId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reprice"
+                },
+                "example": {
+                  "quote_id": "3f1c9a2e-8d4b-4c1e-9a7f-2b6d5e8c1a04",
+                  "rule_version": 1,
+                  "stored_premium": "14322.00",
+                  "recomputed_premium": "14322.00",
+                  "matches": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ]
+      }
+    },
+    "/api/applications": {
+      "post": {
+        "operationId": "submitApplication",
+        "tags": [
+          "applications"
+        ],
+        "summary": "POST /api/applications",
+        "description": "Roles: CUSTOMER (quote owner). Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "CUSTOMER (quote owner)",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Application"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "QUOTE_STALE",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplicationRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{application_id}": {
+      "get": {
+        "operationId": "getApplication",
+        "tags": [
+          "applications"
+        ],
+        "summary": "GET /api/applications/{application_id}",
+        "description": "Roles: CUSTOMER (owner), UNDERWRITER, ADMIN. Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "CUSTOMER (owner), UNDERWRITER, ADMIN",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/ApplicationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ]
+      }
+    },
+    "/api/underwriting/queue": {
+      "get": {
+        "operationId": "getUnderwritingQueue",
+        "tags": [
+          "underwriting"
+        ],
+        "summary": "GET /api/underwriting/queue",
+        "description": "Roles: UNDERWRITER (MANUAL_REVIEW only), ADMIN (both). Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "UNDERWRITER (MANUAL_REVIEW only), ADMIN (both)",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/QueueStatus"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/QueueItem"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ]
+      }
+    },
+    "/api/underwriting/applications/{application_id}/decision": {
+      "post": {
+        "operationId": "decideApplication",
+        "tags": [
+          "underwriting"
+        ],
+        "summary": "POST /api/underwriting/applications/{application_id}/decision",
+        "description": "Roles: UNDERWRITER. Audit: UW_APPROVE | UW_DECLINE. See specs/design/api-contracts.md.",
+        "x-roles": "UNDERWRITER",
+        "x-audit-action": "UW_APPROVE | UW_DECLINE",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/ApplicationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "INVALID_APPLICATION_STATE",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/underwriting/applications/{application_id}/override": {
+      "post": {
+        "operationId": "overrideDecline",
+        "tags": [
+          "underwriting"
+        ],
+        "summary": "POST /api/underwriting/applications/{application_id}/override",
+        "description": "Roles: ADMIN. Audit: UW_OVERRIDE_DECLINE. See specs/design/api-contracts.md.",
+        "x-roles": "ADMIN",
+        "x-audit-action": "UW_OVERRIDE_DECLINE",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/ApplicationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverrideResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "INVALID_APPLICATION_STATE",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverrideRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/underwriting/applications/{application_id}/audit": {
+      "get": {
+        "operationId": "getApplicationAudit",
+        "tags": [
+          "underwriting"
+        ],
+        "summary": "GET /api/underwriting/applications/{application_id}/audit",
+        "description": "Roles: UNDERWRITER, ADMIN. Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "UNDERWRITER, ADMIN",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/ApplicationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationAudit"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ]
+      }
+    },
+    "/api/applications/{application_id}/issue": {
+      "post": {
+        "operationId": "issuePolicy",
+        "tags": [
+          "policies"
+        ],
+        "summary": "POST /api/applications/{application_id}/issue",
+        "description": "Roles: CUSTOMER (owner), ADMIN. Audit: POLICY_ISSUED (ADMIN actor only). See specs/design/api-contracts.md.",
+        "x-roles": "CUSTOMER (owner), ADMIN",
+        "x-audit-action": "POLICY_ISSUED (ADMIN actor only)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/ApplicationId"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicySummary"
+                },
+                "example": {
+                  "policy_number": "MO-2026-000123",
+                  "product": "MOTOR",
+                  "status": "ACTIVE",
+                  "rule_version": 1,
+                  "sum_insured": "400000.00",
+                  "premium": "12400.00",
+                  "currency": "INR",
+                  "effective_date": "2026-10-01",
+                  "expiry_date": "2027-09-30",
+                  "premium_due_date": "2026-10-01",
+                  "next_premium_due_date": "2027-10-01",
+                  "previous_policy_number": null
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "INVALID_APPLICATION_STATE",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ]
+      }
+    },
+    "/api/policies": {
+      "get": {
+        "operationId": "listPolicies",
+        "tags": [
+          "policies"
+        ],
+        "summary": "GET /api/policies",
+        "description": "Roles: CUSTOMER (own), UNDERWRITER, ADMIN (all). Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "CUSTOMER (own), UNDERWRITER, ADMIN (all)",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/ProductFilter"
+          },
+          {
+            "$ref": "#/components/parameters/StatusFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PolicySummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ]
+      }
+    },
+    "/api/policies/{policy_number}": {
+      "get": {
+        "operationId": "getPolicy",
+        "tags": [
+          "policies"
+        ],
+        "summary": "GET /api/policies/{policy_number}",
+        "description": "Roles: CUSTOMER (owner), UNDERWRITER, ADMIN. Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "CUSTOMER (owner), UNDERWRITER, ADMIN",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/PolicyNumber"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ]
+      }
+    },
+    "/api/policies/{policy_number}/endorsements": {
+      "post": {
+        "operationId": "createEndorsement",
+        "tags": [
+          "endorsements"
+        ],
+        "summary": "POST /api/policies/{policy_number}/endorsements",
+        "description": "Roles: CUSTOMER (owner), ADMIN. Audit: ENDORSEMENT_CREATED (ADMIN actor, non-preview). See specs/design/api-contracts.md.",
+        "x-roles": "CUSTOMER (owner), ADMIN",
+        "x-audit-action": "ENDORSEMENT_CREATED (ADMIN actor, non-preview)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/PolicyNumber"
+          },
+          {
+            "$ref": "#/components/parameters/Preview"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Preview (?preview=true) — nothing persisted",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndorsementPreview"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndorsementCreated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "INVALID_POLICY_STATE",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndorsementRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/policies/{policy_number}/renewal": {
+      "get": {
+        "operationId": "getRenewalQuote",
+        "tags": [
+          "renewals"
+        ],
+        "summary": "GET /api/policies/{policy_number}/renewal",
+        "description": "Roles: CUSTOMER (owner), ADMIN. Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "CUSTOMER (owner), ADMIN",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/PolicyNumber"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenewalQuote"
+                },
+                "example": {
+                  "policy_number": "MO-2025-000210",
+                  "renewable": true,
+                  "renewal_premium": "14720.00",
+                  "rule_version": 2,
+                  "currency": "INR",
+                  "due_date": "2026-10-01",
+                  "grace_end_date": "2026-10-31",
+                  "renewal_window_opens": "2026-08-31",
+                  "paid": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "INVALID_POLICY_STATE | NO_PUBLISHED_VERSION",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ]
+      }
+    },
+    "/api/policies/{policy_number}/renew": {
+      "post": {
+        "operationId": "renewPolicy",
+        "tags": [
+          "renewals"
+        ],
+        "summary": "POST /api/policies/{policy_number}/renew",
+        "description": "Roles: CUSTOMER (owner). Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "CUSTOMER (owner)",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/PolicyNumber"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicySummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "INVALID_POLICY_STATE | OUTSIDE_RENEWAL_WINDOW",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR (RENEWAL_PREMIUM_UNPAID, NOT_RENEWABLE)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ]
+      }
+    },
+    "/api/policies/{policy_number}/payments": {
+      "post": {
+        "operationId": "payPremium",
+        "tags": [
+          "renewals"
+        ],
+        "summary": "POST /api/policies/{policy_number}/payments",
+        "description": "Roles: CUSTOMER (owner). Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "CUSTOMER (owner)",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/PolicyNumber"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentCreated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "INVALID_POLICY_STATE | OUTSIDE_RENEWAL_WINDOW | PREMIUM_ALREADY_PAID | NO_PUBLISHED_VERSION",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR (AMOUNT_MISMATCH, NOT_RENEWABLE, malformed)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/policies/{policy_number}/cancellation-preview": {
+      "get": {
+        "operationId": "previewCancellation",
+        "tags": [
+          "cancellations"
+        ],
+        "summary": "GET /api/policies/{policy_number}/cancellation-preview",
+        "description": "Roles: CUSTOMER (owner), ADMIN. Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "CUSTOMER (owner), ADMIN",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/PolicyNumber"
+          },
+          {
+            "$ref": "#/components/parameters/CancellationDateQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundBreakdown"
+                },
+                "example": {
+                  "policy_number": "MO-2026-000123",
+                  "cancellation_date": "2027-04-01",
+                  "refund_type": "PRO_RATA",
+                  "premium_paid": "12400.00",
+                  "term_days": 365,
+                  "days_elapsed": 182,
+                  "unused_days": 183,
+                  "admin_fee": "250.00",
+                  "amount": "5966.99",
+                  "rule_version": 1
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "INVALID_POLICY_STATE",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR (REQUIRED, INVALID_FORMAT, OUTSIDE_TERM)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ]
+      }
+    },
+    "/api/policies/{policy_number}/cancel": {
+      "post": {
+        "operationId": "cancelPolicy",
+        "tags": [
+          "cancellations"
+        ],
+        "summary": "POST /api/policies/{policy_number}/cancel",
+        "description": "Roles: CUSTOMER (owner), ADMIN. Audit: POLICY_CANCELLED (ADMIN actor only). See specs/design/api-contracts.md.",
+        "x-roles": "CUSTOMER (owner), ADMIN",
+        "x-audit-action": "POLICY_CANCELLED (ADMIN actor only)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/PolicyNumber"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "INVALID_POLICY_STATE",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/end-of-day": {
+      "post": {
+        "operationId": "runEndOfDay",
+        "tags": [
+          "admin"
+        ],
+        "summary": "POST /api/admin/end-of-day",
+        "description": "Roles: ADMIN. Audit: RUN_END_OF_DAY. See specs/design/api-contracts.md.",
+        "x-roles": "ADMIN",
+        "x-audit-action": "RUN_END_OF_DAY",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndOfDayResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndOfDayRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/portfolio": {
+      "get": {
+        "operationId": "getPortfolio",
+        "tags": [
+          "admin"
+        ],
+        "summary": "GET /api/admin/portfolio",
+        "description": "Roles: ADMIN. Audit: —. See specs/design/api-contracts.md.",
+        "x-roles": "ADMIN",
+        "x-audit-action": null,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XActorId"
+          },
+          {
+            "$ref": "#/components/parameters/XActorRole"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/AsOfQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Portfolio"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unhandled error (HTTP 500) — error envelope, transaction rolled back (OI-3)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/XCorrelationIdOut"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ActorId": [],
+            "ActorRole": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ActorId": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Actor-Id",
+        "description": "Role-header auth stub: actor id (e.g. cust-001)."
+      },
+      "ActorRole": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Actor-Role",
+        "description": "CUSTOMER | UNDERWRITER | ADMIN. SYSTEM or unknown → 401."
+      }
+    },
+    "parameters": {
+      "XActorId": {
+        "name": "X-Actor-Id",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "example": "cust-001"
+      },
+      "XActorRole": {
+        "name": "X-Actor-Role",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/ActorRole"
+        }
+      },
+      "XCorrelationId": {
+        "name": "X-Correlation-ID",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Echoed on the response; a UUID4 is generated when absent."
+      },
+      "Product": {
+        "name": "product",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/ProductCode"
+        }
+      },
+      "Version": {
+        "name": "version",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "QuoteId": {
+        "name": "quote_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "ApplicationId": {
+        "name": "application_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "PolicyNumber": {
+        "name": "policy_number",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^(TL|MO|HH)-\\d{4}-\\d{6}$"
+        },
+        "example": "MO-2026-000123"
+      },
+      "QueueStatus": {
+        "name": "status",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "MANUAL_REVIEW",
+            "DECLINED"
+          ]
+        }
+      },
+      "ProductFilter": {
+        "name": "product",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "$ref": "#/components/schemas/ProductCode"
+        }
+      },
+      "StatusFilter": {
+        "name": "status",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "$ref": "#/components/schemas/PolicyStatus"
+        }
+      },
+      "Preview": {
+        "name": "preview",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "CancellationDateQuery": {
+        "name": "date",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "date"
+        }
+      },
+      "AsOfQuery": {
+        "name": "as_of",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "headers": {
+      "XCorrelationIdOut": {
+        "description": "Correlation id (echoed or generated UUID4).",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "schemas": {
+      "Money": {
+        "type": "string",
+        "pattern": "^-?\\d+\\.\\d{2}$",
+        "description": "Decimal money as a JSON string with two decimals (NFR-01). Never a JSON number.",
+        "example": "14322.00"
+      },
+      "DecimalString": {
+        "type": "string",
+        "pattern": "^-?\\d+(\\.\\d+)?$",
+        "description": "Decimal rate/multiplier/share as a JSON string."
+      },
+      "ProductCode": {
+        "type": "string",
+        "enum": [
+          "TERM_LIFE",
+          "MOTOR",
+          "HOUSEHOLD"
+        ]
+      },
+      "PolicyStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "ENDORSED",
+          "LAPSED",
+          "CANCELLED",
+          "RENEWED"
+        ]
+      },
+      "ApplicationStatus": {
+        "type": "string",
+        "enum": [
+          "SUBMITTED",
+          "UNDERWRITING",
+          "AUTO_BIND",
+          "MANUAL_REVIEW",
+          "DECLINED",
+          "ISSUED"
+        ]
+      },
+      "Decision": {
+        "type": "string",
+        "enum": [
+          "AUTO_BIND",
+          "MANUAL_REVIEW",
+          "DECLINE"
+        ]
+      },
+      "UnderwriterDecision": {
+        "type": "string",
+        "enum": [
+          "APPROVE",
+          "DECLINE"
+        ]
+      },
+      "EndorsementType": {
+        "type": "string",
+        "enum": [
+          "CHANGE_ADDRESS",
+          "ADD_NOMINEE",
+          "CHANGE_SUM_INSURED"
+        ]
+      },
+      "ActorRole": {
+        "type": "string",
+        "enum": [
+          "CUSTOMER",
+          "UNDERWRITER",
+          "ADMIN"
+        ],
+        "description": "Accepted X-Actor-Role values. The internal SYSTEM role (DEC-010) is rejected with 401 if sent."
+      },
+      "RefundType": {
+        "type": "string",
+        "enum": [
+          "FREE_LOOK",
+          "PRO_RATA"
+        ]
+      },
+      "RuleVersionStatus": {
+        "type": "string",
+        "enum": [
+          "DRAFT",
+          "PUBLISHED"
+        ]
+      },
+      "NomineeRelationship": {
+        "type": "string",
+        "enum": [
+          "SPOUSE",
+          "CHILD",
+          "PARENT",
+          "SIBLING",
+          "OTHER"
+        ]
+      },
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "VALIDATION_ERROR",
+          "UNAUTHENTICATED",
+          "FORBIDDEN",
+          "NOT_FOUND",
+          "NO_PUBLISHED_VERSION",
+          "VERSION_IMMUTABLE",
+          "DRAFT_ALREADY_OPEN",
+          "INVALID_POLICY_STATE",
+          "INVALID_APPLICATION_STATE",
+          "QUOTE_STALE",
+          "PREMIUM_ALREADY_PAID",
+          "OUTSIDE_RENEWAL_WINDOW"
+        ]
+      },
+      "DetailCode": {
+        "type": "string",
+        "enum": [
+          "REQUIRED",
+          "OUT_OF_RANGE",
+          "INVALID_FORMAT",
+          "UNKNOWN_CODE",
+          "UNKNOWN_FIELD",
+          "MONEY_MUST_BE_STRING",
+          "NOT_ALLOWED",
+          "UNCHANGED",
+          "SHARE_EXCEEDS_100",
+          "AMOUNT_MISMATCH",
+          "OUTSIDE_TERM",
+          "NOT_RENEWABLE",
+          "RENEWAL_PREMIUM_UNPAID",
+          "UNKNOWN_REASON_CODE",
+          "SCHEMA_VIOLATION"
+        ]
+      },
+      "FieldError": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "code": {
+            "$ref": "#/components/schemas/DetailCode"
+          }
+        },
+        "required": [
+          "field",
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "One of ErrorCode (a 500 response carries an implementation-defined code until conventions adds one, OI-3)."
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/FieldError"
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                ]
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "details"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/ProductCode"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active_version": {
+            "type": "integer",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "INR"
+            ]
+          }
+        },
+        "required": [
+          "product",
+          "name",
+          "active_version",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "RuleFile": {
+        "type": "object",
+        "description": "Rule-file body; authoritative schema is backend/policy_rules/schema/rule-file.schema.json.",
+        "required": [
+          "product",
+          "effective_from",
+          "currency",
+          "premium",
+          "eligibility",
+          "underwriting",
+          "endorsement",
+          "renewal",
+          "cancellation"
+        ],
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/ProductCode"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "$ref": "#/components/schemas/RuleVersionStatus"
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "INR"
+            ]
+          },
+          "premium": {
+            "type": "object",
+            "required": [
+              "base_rate",
+              "minimum_premium",
+              "factors"
+            ],
+            "properties": {
+              "base_rate": {
+                "$ref": "#/components/schemas/DecimalString"
+              },
+              "minimum_premium": {
+                "$ref": "#/components/schemas/Money"
+              },
+              "factors": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          },
+          "eligibility": {
+            "type": "object",
+            "required": [
+              "min_age",
+              "max_age",
+              "min_sum_insured",
+              "max_sum_insured"
+            ],
+            "properties": {
+              "min_age": {
+                "type": "integer"
+              },
+              "max_age": {
+                "type": "integer"
+              },
+              "min_sum_insured": {
+                "$ref": "#/components/schemas/Money"
+              },
+              "max_sum_insured": {
+                "$ref": "#/components/schemas/Money"
+              }
+            }
+          },
+          "underwriting": {
+            "type": "object",
+            "required": [
+              "rules",
+              "reason_codes"
+            ],
+            "properties": {
+              "rules": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "when": {
+                      "type": "string"
+                    },
+                    "decision": {
+                      "$ref": "#/components/schemas/Decision"
+                    },
+                    "reason_code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "when",
+                    "decision",
+                    "reason_code"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "reason_codes": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "endorsement": {
+            "type": "object",
+            "required": [
+              "allowed_types"
+            ],
+            "properties": {
+              "allowed_types": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/EndorsementType"
+                }
+              }
+            }
+          },
+          "renewal": {
+            "type": "object",
+            "required": [
+              "term_months",
+              "grace_period_days"
+            ],
+            "properties": {
+              "term_months": {
+                "type": "integer"
+              },
+              "grace_period_days": {
+                "type": "integer"
+              }
+            }
+          },
+          "cancellation": {
+            "type": "object",
+            "required": [
+              "method",
+              "free_look_days",
+              "admin_fee"
+            ],
+            "properties": {
+              "method": {
+                "type": "string",
+                "enum": [
+                  "PRO_RATA"
+                ]
+              },
+              "free_look_days": {
+                "type": "integer"
+              },
+              "admin_fee": {
+                "$ref": "#/components/schemas/Money"
+              }
+            }
+          }
+        }
+      },
+      "RuleVersion": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/ProductCode"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RuleVersionStatus"
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/RuleFile"
+          }
+        },
+        "required": [
+          "product",
+          "version",
+          "status",
+          "effective_from",
+          "is_active",
+          "created_at",
+          "rules"
+        ],
+        "additionalProperties": false
+      },
+      "RuleVersionRef": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/ProductCode"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RuleVersionStatus"
+          }
+        },
+        "required": [
+          "product",
+          "version",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "PublishedVersion": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/ProductCode"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PUBLISHED"
+            ]
+          },
+          "is_active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "product",
+          "version",
+          "status",
+          "is_active"
+        ],
+        "additionalProperties": false
+      },
+      "QuoteInputs": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sum_insured"
+        ],
+        "description": "Per-product canonical fields (docs/conventions.md). TERM_LIFE: age, term_years, smoker. MOTOR: owner_age, vehicle_age_years, engine_cc, zone, ncb_percent. HOUSEHOLD: proposer_age, construction_type, in_flood_zone, has_security_system.",
+        "properties": {
+          "sum_insured": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "age": {
+            "type": "integer"
+          },
+          "term_years": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 30
+          },
+          "smoker": {
+            "type": "boolean"
+          },
+          "owner_age": {
+            "type": "integer"
+          },
+          "vehicle_age_years": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "engine_cc": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "zone": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B"
+            ]
+          },
+          "ncb_percent": {
+            "type": "string",
+            "enum": [
+              "0",
+              "20",
+              "25",
+              "35",
+              "45",
+              "50"
+            ]
+          },
+          "proposer_age": {
+            "type": "integer"
+          },
+          "construction_type": {
+            "type": "string",
+            "enum": [
+              "CONCRETE",
+              "BRICK",
+              "TIMBER",
+              "THATCH"
+            ]
+          },
+          "in_flood_zone": {
+            "type": "boolean"
+          },
+          "has_security_system": {
+            "type": "boolean"
+          }
+        }
+      },
+      "QuoteRequest": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/ProductCode"
+          },
+          "inputs": {
+            "$ref": "#/components/schemas/QuoteInputs"
+          }
+        },
+        "required": [
+          "product",
+          "inputs"
+        ],
+        "additionalProperties": false
+      },
+      "QuoteCreated": {
+        "type": "object",
+        "properties": {
+          "quote_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "$ref": "#/components/schemas/ProductCode"
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "sum_insured": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "premium": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "quote_id",
+          "product",
+          "rule_version",
+          "sum_insured",
+          "premium",
+          "currency",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "Quote": {
+        "type": "object",
+        "properties": {
+          "quote_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "$ref": "#/components/schemas/ProductCode"
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "inputs": {
+            "$ref": "#/components/schemas/QuoteInputs"
+          },
+          "sum_insured": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "premium": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "quote_id",
+          "product",
+          "rule_version",
+          "inputs",
+          "sum_insured",
+          "premium",
+          "currency",
+          "actor_id",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "Reprice": {
+        "type": "object",
+        "properties": {
+          "quote_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "stored_premium": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "recomputed_premium": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "matches": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "quote_id",
+          "rule_version",
+          "stored_premium",
+          "recomputed_premium",
+          "matches"
+        ],
+        "additionalProperties": false
+      },
+      "KycInput": {
+        "type": "object",
+        "properties": {
+          "full_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "date_of_birth": {
+            "type": "string",
+            "format": "date"
+          },
+          "aadhaar": {
+            "type": "string",
+            "pattern": "^\\d{12}$"
+          },
+          "pan": {
+            "type": "string",
+            "pattern": "^[A-Z]{5}[0-9]{4}[A-Z]$"
+          },
+          "address": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "full_name",
+          "date_of_birth",
+          "aadhaar",
+          "pan",
+          "address"
+        ],
+        "additionalProperties": false
+      },
+      "HealthDeclaration": {
+        "type": "object",
+        "properties": {
+          "has_pre_existing_condition": {
+            "type": "boolean"
+          },
+          "details": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "has_pre_existing_condition",
+          "details"
+        ],
+        "additionalProperties": false
+      },
+      "ApplicationRequest": {
+        "type": "object",
+        "properties": {
+          "quote_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kyc": {
+            "$ref": "#/components/schemas/KycInput"
+          },
+          "health_declaration": {
+            "$ref": "#/components/schemas/HealthDeclaration"
+          }
+        },
+        "required": [
+          "quote_id",
+          "kyc"
+        ],
+        "additionalProperties": false
+      },
+      "MaskedKyc": {
+        "type": "object",
+        "properties": {
+          "full_name": {
+            "type": "string"
+          },
+          "date_of_birth": {
+            "type": "string",
+            "format": "date"
+          },
+          "aadhaar_masked": {
+            "type": "string",
+            "example": "XXXX-XXXX-0001"
+          },
+          "pan_masked": {
+            "type": "string",
+            "example": "XXXXX0001X"
+          },
+          "address": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "full_name",
+          "date_of_birth",
+          "aadhaar_masked",
+          "pan_masked",
+          "address"
+        ],
+        "additionalProperties": false
+      },
+      "Reason": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "description"
+        ],
+        "additionalProperties": false
+      },
+      "StatusHistoryEntry": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/ApplicationStatus"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "status",
+          "at"
+        ],
+        "additionalProperties": false
+      },
+      "UnderwritingDecision": {
+        "type": "object",
+        "properties": {
+          "decision_id": {
+            "type": "integer"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/Decision"
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reason"
+            }
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "decided_by": {
+            "type": "string"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "decision_id",
+          "decision",
+          "reason_codes",
+          "reasons",
+          "rule_version",
+          "decided_by",
+          "comment",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "UnderwritingOverride": {
+        "type": "object",
+        "properties": {
+          "override_id": {
+            "type": "integer"
+          },
+          "overridden_decision_id": {
+            "type": "integer"
+          },
+          "from_status": {
+            "type": "string",
+            "enum": [
+              "DECLINED"
+            ]
+          },
+          "to_status": {
+            "type": "string",
+            "enum": [
+              "AUTO_BIND"
+            ]
+          },
+          "reason_code": {
+            "type": "string"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "override_id",
+          "overridden_decision_id",
+          "from_status",
+          "to_status",
+          "reason_code",
+          "comment",
+          "actor_id",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "Application": {
+        "type": "object",
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quote_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "$ref": "#/components/schemas/ProductCode"
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ApplicationStatus"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/Decision"
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reason"
+            }
+          },
+          "kyc": {
+            "$ref": "#/components/schemas/MaskedKyc"
+          },
+          "status_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatusHistoryEntry"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "application_id",
+          "quote_id",
+          "product",
+          "rule_version",
+          "status",
+          "decision",
+          "reason_codes",
+          "reasons",
+          "kyc",
+          "status_history",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "ApplicationDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Application"
+          },
+          {
+            "type": "object",
+            "required": [
+              "decisions",
+              "overrides",
+              "policy_number"
+            ],
+            "properties": {
+              "decisions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/UnderwritingDecision"
+                }
+              },
+              "overrides": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/UnderwritingOverride"
+                }
+              },
+              "policy_number": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "QueueItem": {
+        "type": "object",
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "$ref": "#/components/schemas/ProductCode"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ApplicationStatus"
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sum_insured": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "premium": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnderwritingDecision"
+            }
+          }
+        },
+        "required": [
+          "application_id",
+          "product",
+          "status",
+          "rule_version",
+          "reason_codes",
+          "sum_insured",
+          "premium",
+          "submitted_at",
+          "decisions"
+        ],
+        "additionalProperties": false
+      },
+      "DecisionRequest": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/UnderwriterDecision"
+          },
+          "reason_codes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "decision",
+          "reason_codes"
+        ],
+        "additionalProperties": false
+      },
+      "DecisionResult": {
+        "type": "object",
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ApplicationStatus"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/UnderwritingDecision"
+          }
+        },
+        "required": [
+          "application_id",
+          "status",
+          "decision"
+        ],
+        "additionalProperties": false
+      },
+      "OverrideRequest": {
+        "type": "object",
+        "properties": {
+          "reason_code": {
+            "type": "string"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason_code",
+          "comment"
+        ],
+        "additionalProperties": false
+      },
+      "OverrideResult": {
+        "type": "object",
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "AUTO_BIND"
+            ]
+          },
+          "override": {
+            "$ref": "#/components/schemas/UnderwritingOverride"
+          }
+        },
+        "required": [
+          "application_id",
+          "status",
+          "override"
+        ],
+        "additionalProperties": false
+      },
+      "AuditRecord": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "RULE_VERSION_DRAFT_CREATED",
+              "RULE_VERSION_PUBLISHED",
+              "UW_APPROVE",
+              "UW_DECLINE",
+              "UW_OVERRIDE_DECLINE",
+              "POLICY_ISSUED",
+              "ENDORSEMENT_CREATED",
+              "POLICY_CANCELLED",
+              "RUN_END_OF_DAY"
+            ]
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "actor_role": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "UNDERWRITER",
+              "ADMIN",
+              "SYSTEM"
+            ]
+          },
+          "entity_type": {
+            "type": "string"
+          },
+          "entity_id": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "correlation_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "action",
+          "actor_id",
+          "actor_role",
+          "entity_type",
+          "entity_id",
+          "detail",
+          "correlation_id",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "ApplicationAudit": {
+        "type": "object",
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnderwritingDecision"
+            }
+          },
+          "overrides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnderwritingOverride"
+            }
+          },
+          "audit_records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditRecord"
+            }
+          }
+        },
+        "required": [
+          "application_id",
+          "decisions",
+          "overrides",
+          "audit_records"
+        ],
+        "additionalProperties": false
+      },
+      "PolicySummary": {
+        "type": "object",
+        "properties": {
+          "policy_number": {
+            "type": "string",
+            "pattern": "^(TL|MO|HH)-\\d{4}-\\d{6}$"
+          },
+          "product": {
+            "$ref": "#/components/schemas/ProductCode"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PolicyStatus"
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "sum_insured": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "premium": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "effective_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "expiry_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "premium_due_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "next_premium_due_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "previous_policy_number": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "policy_number",
+          "product",
+          "status",
+          "rule_version",
+          "sum_insured",
+          "premium",
+          "currency",
+          "effective_date",
+          "expiry_date",
+          "premium_due_date",
+          "next_premium_due_date",
+          "previous_policy_number"
+        ],
+        "additionalProperties": false
+      },
+      "Nominee": {
+        "type": "object",
+        "properties": {
+          "nominee_name": {
+            "type": "string"
+          },
+          "relationship": {
+            "$ref": "#/components/schemas/NomineeRelationship"
+          },
+          "share_percent": {
+            "$ref": "#/components/schemas/DecimalString"
+          }
+        },
+        "required": [
+          "nominee_name",
+          "relationship",
+          "share_percent"
+        ],
+        "additionalProperties": false
+      },
+      "Insured": {
+        "type": "object",
+        "properties": {
+          "full_name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "aadhaar_masked": {
+            "type": "string"
+          },
+          "pan_masked": {
+            "type": "string"
+          },
+          "nominees": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Nominee"
+            }
+          }
+        },
+        "required": [
+          "full_name",
+          "address",
+          "aadhaar_masked",
+          "pan_masked",
+          "nominees"
+        ],
+        "additionalProperties": false
+      },
+      "Transition": {
+        "type": "object",
+        "properties": {
+          "from_status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PolicyStatus"
+              }
+            ],
+            "nullable": true
+          },
+          "to_status": {
+            "$ref": "#/components/schemas/PolicyStatus"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "from_status",
+          "to_status",
+          "reason",
+          "actor_id",
+          "occurred_at"
+        ],
+        "additionalProperties": false
+      },
+      "Endorsement": {
+        "type": "object",
+        "properties": {
+          "endorsement_id": {
+            "type": "integer"
+          },
+          "type": {
+            "$ref": "#/components/schemas/EndorsementType"
+          },
+          "before": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "after": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "premium_delta": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "endorsement_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "endorsement_id",
+          "type",
+          "before",
+          "after",
+          "premium_delta",
+          "rule_version",
+          "endorsement_date",
+          "actor_id",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "payment_id": {
+            "type": "integer"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "paid_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "payment_id",
+          "due_date",
+          "amount",
+          "rule_version",
+          "actor_id",
+          "paid_at"
+        ],
+        "additionalProperties": false
+      },
+      "RefundBreakdown": {
+        "type": "object",
+        "properties": {
+          "policy_number": {
+            "type": "string"
+          },
+          "cancellation_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "refund_type": {
+            "$ref": "#/components/schemas/RefundType"
+          },
+          "premium_paid": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "term_days": {
+            "type": "integer"
+          },
+          "days_elapsed": {
+            "type": "integer"
+          },
+          "unused_days": {
+            "type": "integer"
+          },
+          "admin_fee": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "rule_version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "policy_number",
+          "cancellation_date",
+          "refund_type",
+          "premium_paid",
+          "term_days",
+          "days_elapsed",
+          "unused_days",
+          "admin_fee",
+          "amount",
+          "rule_version"
+        ],
+        "additionalProperties": false
+      },
+      "Refund": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RefundBreakdown"
+          },
+          {
+            "type": "object",
+            "required": [
+              "refund_id",
+              "reason",
+              "actor_id",
+              "created_at"
+            ],
+            "properties": {
+              "refund_id": {
+                "type": "integer"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "actor_id": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        ]
+      },
+      "PolicyDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PolicySummary"
+          },
+          {
+            "type": "object",
+            "required": [
+              "successor_policy_number",
+              "application_id",
+              "insured",
+              "transitions",
+              "endorsements",
+              "payments",
+              "refunds"
+            ],
+            "properties": {
+              "successor_policy_number": {
+                "type": "string",
+                "nullable": true
+              },
+              "application_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "insured": {
+                "$ref": "#/components/schemas/Insured"
+              },
+              "transitions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Transition"
+                }
+              },
+              "endorsements": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Endorsement"
+                }
+              },
+              "payments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Payment"
+                }
+              },
+              "refunds": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Refund"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "EndorsementRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type"
+        ],
+        "description": "CHANGE_ADDRESS: address. ADD_NOMINEE: nominee_name, relationship, share_percent. CHANGE_SUM_INSURED: new_sum_insured.",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/EndorsementType"
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "nominee_name": {
+            "type": "string"
+          },
+          "relationship": {
+            "$ref": "#/components/schemas/NomineeRelationship"
+          },
+          "share_percent": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "new_sum_insured": {
+            "$ref": "#/components/schemas/Money"
+          }
+        }
+      },
+      "EndorsementCreated": {
+        "type": "object",
+        "properties": {
+          "endorsement_id": {
+            "type": "integer"
+          },
+          "policy_number": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/EndorsementType"
+          },
+          "before": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "after": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "new_premium": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "premium_delta": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "endorsement_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/PolicySummary"
+          }
+        },
+        "required": [
+          "endorsement_id",
+          "policy_number",
+          "type",
+          "before",
+          "after",
+          "new_premium",
+          "premium_delta",
+          "rule_version",
+          "endorsement_date",
+          "created_at",
+          "policy"
+        ],
+        "additionalProperties": false
+      },
+      "EndorsementPreview": {
+        "type": "object",
+        "properties": {
+          "policy_number": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/EndorsementType"
+          },
+          "preview": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "before": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "after": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "new_premium": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "premium_delta": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "endorsement_date": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "policy_number",
+          "type",
+          "preview",
+          "before",
+          "after",
+          "new_premium",
+          "premium_delta",
+          "rule_version",
+          "endorsement_date"
+        ],
+        "additionalProperties": false
+      },
+      "RenewalQuote": {
+        "type": "object",
+        "properties": {
+          "policy_number": {
+            "type": "string"
+          },
+          "renewable": {
+            "type": "boolean"
+          },
+          "renewal_premium": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "nullable": true
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "grace_end_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "renewal_window_opens": {
+            "type": "string",
+            "format": "date"
+          },
+          "paid": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "policy_number",
+          "renewable",
+          "renewal_premium",
+          "rule_version",
+          "currency",
+          "due_date",
+          "grace_end_date",
+          "renewal_window_opens",
+          "paid"
+        ],
+        "additionalProperties": false
+      },
+      "PaymentRequest": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "amount"
+        ],
+        "additionalProperties": false
+      },
+      "PaymentCreated": {
+        "type": "object",
+        "properties": {
+          "payment_id": {
+            "type": "integer"
+          },
+          "policy_number": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "paid_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "payment_id",
+          "policy_number",
+          "amount",
+          "due_date",
+          "rule_version",
+          "actor_id",
+          "paid_at"
+        ],
+        "additionalProperties": false
+      },
+      "CancelRequest": {
+        "type": "object",
+        "properties": {
+          "cancellation_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "cancellation_date",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "CancelResult": {
+        "type": "object",
+        "properties": {
+          "policy_number": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "CANCELLED"
+            ]
+          },
+          "refund": {
+            "$ref": "#/components/schemas/Refund"
+          }
+        },
+        "required": [
+          "policy_number",
+          "status",
+          "refund"
+        ],
+        "additionalProperties": false
+      },
+      "EndOfDayRequest": {
+        "type": "object",
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "as_of"
+        ],
+        "additionalProperties": false
+      },
+      "EndOfDayResult": {
+        "type": "object",
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date"
+          },
+          "renewed": {
+            "type": "integer"
+          },
+          "lapsed": {
+            "type": "integer"
+          },
+          "in_grace": {
+            "type": "integer"
+          },
+          "not_renewable": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "integer"
+          },
+          "renewed_policies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string"
+                },
+                "to": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "lapsed_policies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failed_policies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "as_of",
+          "renewed",
+          "lapsed",
+          "in_grace",
+          "not_renewable",
+          "failed",
+          "renewed_policies",
+          "lapsed_policies",
+          "failed_policies"
+        ],
+        "additionalProperties": false
+      },
+      "Portfolio": {
+        "type": "object",
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date"
+          },
+          "active_by_product": {
+            "type": "object",
+            "properties": {
+              "TERM_LIFE": {
+                "type": "integer"
+              },
+              "MOTOR": {
+                "type": "integer"
+              },
+              "HOUSEHOLD": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "TERM_LIFE",
+              "MOTOR",
+              "HOUSEHOLD"
+            ],
+            "additionalProperties": false
+          },
+          "premium_collected": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "refunds_paid": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "renewal_pipeline": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "policy_number": {
+                  "type": "string"
+                },
+                "product": {
+                  "$ref": "#/components/schemas/ProductCode"
+                },
+                "due_date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "renewal_premium": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Money"
+                    }
+                  ],
+                  "nullable": true
+                },
+                "paid": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "policy_number",
+                "product",
+                "due_date",
+                "renewal_premium",
+                "paid"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "lapse_forecast": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer"
+              },
+              "premium_at_risk": {
+                "$ref": "#/components/schemas/Money"
+              },
+              "policies": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "policy_number": {
+                      "type": "string"
+                    },
+                    "product": {
+                      "$ref": "#/components/schemas/ProductCode"
+                    },
+                    "due_date": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "grace_end_date": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "premium": {
+                      "$ref": "#/components/schemas/Money"
+                    }
+                  },
+                  "required": [
+                    "policy_number",
+                    "product",
+                    "due_date",
+                    "grace_end_date",
+                    "premium"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "count",
+              "premium_at_risk",
+              "policies"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "as_of",
+          "active_by_product",
+          "premium_collected",
+          "refunds_paid",
+          "renewal_pipeline",
+          "lapse_forecast"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

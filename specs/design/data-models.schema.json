@@ -1,0 +1,409 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://policyforge.local/specs/design/data-models.schema.json",
+  "title": "PolicyForge data models",
+  "description": "JSON shapes of the 11 persisted entities (docs/conventions.md -> Persistence) as they appear in fixtures, seeds and API payloads. Money is a 2-decimal string, never a JSON number. Human-readable twin: specs/design/data-models.md.",
+  "type": "object",
+  "definitions": {
+    "Uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "Money": {
+      "description": "Decimal amount quantized to 0.01 ROUND_HALF_UP, serialised as a string (NFR-01). Signed: premium_delta may be negative.",
+      "type": "string",
+      "pattern": "^-?\\d+\\.\\d{2}$"
+    },
+    "NonNegativeMoney": {
+      "allOf": [
+        { "$ref": "#/definitions/Money" },
+        { "type": "string", "pattern": "^\\d+\\.\\d{2}$" }
+      ]
+    },
+    "PositiveMoney": {
+      "allOf": [
+        { "$ref": "#/definitions/NonNegativeMoney" },
+        { "not": { "type": "string", "pattern": "^0+\\.00$" } }
+      ]
+    },
+    "DecimalString": {
+      "description": "Rate / share as a decimal string (rates stored Numeric(9, 6) where columns exist).",
+      "type": "string",
+      "pattern": "^\\d+(\\.\\d{1,6})?$"
+    },
+    "Date": { "type": "string", "format": "date", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "DateTime": { "type": "string", "format": "date-time" },
+    "ActorId": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "Sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "RuleVersionNumber": { "type": "integer", "minimum": 1 },
+    "PolicyNumber": { "type": "string", "pattern": "^(TL|MO|HH)-\\d{4}-\\d{6}$" },
+    "ReasonCode": { "type": "string", "pattern": "^(TL|MO|HH)-UW-\\d{3}$" },
+    "AadhaarMasked": { "type": "string", "pattern": "^XXXX-XXXX-\\d{4}$" },
+    "PanMasked": { "type": "string", "pattern": "^XXXXX\\d{4}X$" },
+
+    "ProductCode": { "type": "string", "enum": ["TERM_LIFE", "MOTOR", "HOUSEHOLD"] },
+    "RuleStatus": { "type": "string", "enum": ["DRAFT", "PUBLISHED"] },
+    "ApplicationStatus": {
+      "type": "string",
+      "enum": ["SUBMITTED", "UNDERWRITING", "AUTO_BIND", "MANUAL_REVIEW", "DECLINED", "ISSUED"]
+    },
+    "Decision": { "type": "string", "enum": ["AUTO_BIND", "MANUAL_REVIEW", "DECLINE"] },
+    "UnderwriterDecision": { "type": "string", "enum": ["APPROVE", "DECLINE"] },
+    "PolicyStatus": { "type": "string", "enum": ["ACTIVE", "ENDORSED", "LAPSED", "CANCELLED", "RENEWED"] },
+    "EndorsementType": { "type": "string", "enum": ["CHANGE_ADDRESS", "ADD_NOMINEE", "CHANGE_SUM_INSURED"] },
+    "RefundType": { "type": "string", "enum": ["FREE_LOOK", "PRO_RATA"] },
+    "ActorRole": { "type": "string", "enum": ["CUSTOMER", "UNDERWRITER", "ADMIN", "SYSTEM"] },
+    "EndOfDayAction": { "type": "string", "enum": ["NONE", "RENEW", "IN_GRACE", "LAPSE"] },
+    "AuditAction": {
+      "type": "string",
+      "enum": [
+        "RULE_VERSION_DRAFT_CREATED",
+        "RULE_VERSION_PUBLISHED",
+        "UW_APPROVE",
+        "UW_DECLINE",
+        "UW_OVERRIDE_DECLINE",
+        "POLICY_ISSUED",
+        "ENDORSEMENT_CREATED",
+        "POLICY_CANCELLED",
+        "RUN_END_OF_DAY"
+      ]
+    },
+    "AuditEntityType": { "type": "string", "enum": ["RULE_SET_VERSION", "APPLICATION", "POLICY", "END_OF_DAY"] },
+    "NomineeRelationship": { "type": "string", "enum": ["SPOUSE", "CHILD", "PARENT", "SIBLING", "OTHER"] },
+
+    "TermLifeInputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sum_insured", "age", "term_years", "smoker"],
+      "properties": {
+        "sum_insured": { "$ref": "#/definitions/PositiveMoney" },
+        "age": { "type": "integer", "minimum": 0 },
+        "term_years": { "type": "integer", "minimum": 5, "maximum": 30 },
+        "smoker": { "type": "boolean" }
+      }
+    },
+    "MotorInputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sum_insured", "owner_age", "vehicle_age_years", "engine_cc", "zone", "ncb_percent"],
+      "properties": {
+        "sum_insured": { "$ref": "#/definitions/PositiveMoney" },
+        "owner_age": { "type": "integer", "minimum": 0 },
+        "vehicle_age_years": { "type": "integer", "minimum": 0 },
+        "engine_cc": { "type": "integer", "minimum": 1 },
+        "zone": { "type": "string", "enum": ["A", "B"] },
+        "ncb_percent": { "type": "string", "enum": ["0", "20", "25", "35", "45", "50"] }
+      }
+    },
+    "HouseholdInputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sum_insured", "proposer_age", "construction_type", "in_flood_zone", "has_security_system"],
+      "properties": {
+        "sum_insured": { "$ref": "#/definitions/PositiveMoney" },
+        "proposer_age": { "type": "integer", "minimum": 0 },
+        "construction_type": { "type": "string", "enum": ["CONCRETE", "BRICK", "TIMBER", "THATCH"] },
+        "in_flood_zone": { "type": "boolean" },
+        "has_security_system": { "type": "boolean" }
+      }
+    },
+    "RatingInputs": {
+      "oneOf": [
+        { "$ref": "#/definitions/TermLifeInputs" },
+        { "$ref": "#/definitions/MotorInputs" },
+        { "$ref": "#/definitions/HouseholdInputs" }
+      ]
+    },
+    "Nominee": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nominee_name", "relationship", "share_percent"],
+      "properties": {
+        "nominee_name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "relationship": { "$ref": "#/definitions/NomineeRelationship" },
+        "share_percent": { "$ref": "#/definitions/DecimalString" }
+      }
+    },
+
+    "RuleSetVersion": {
+      "description": "rule_set_versions (append-only). Current state of (product, version) = row with highest revision.",
+      "type": "object",
+      "additionalProperties": false,
+      "x-table": "rule_set_versions",
+      "x-append-only": true,
+      "required": ["id", "product", "version", "revision", "status", "effective_from", "content", "content_sha256", "actor_id", "created_at"],
+      "properties": {
+        "id": { "$ref": "#/definitions/Uuid" },
+        "product": { "$ref": "#/definitions/ProductCode" },
+        "version": { "$ref": "#/definitions/RuleVersionNumber" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "status": { "$ref": "#/definitions/RuleStatus" },
+        "effective_from": { "$ref": "#/definitions/Date" },
+        "content": {
+          "description": "Full rule-file body; validated separately by backend/policy_rules/schema/rule-file.schema.json.",
+          "type": "object",
+          "required": ["product", "version", "status", "effective_from", "currency", "premium", "eligibility", "underwriting", "endorsement", "renewal", "cancellation"]
+        },
+        "content_sha256": { "$ref": "#/definitions/Sha256" },
+        "actor_id": { "$ref": "#/definitions/ActorId" },
+        "created_at": { "$ref": "#/definitions/DateTime" }
+      }
+    },
+
+    "Quote": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-table": "quotes",
+      "x-append-only": false,
+      "required": ["id", "product", "rule_version", "inputs", "sum_insured", "premium", "currency", "actor_id", "created_at"],
+      "properties": {
+        "id": { "$ref": "#/definitions/Uuid" },
+        "product": { "$ref": "#/definitions/ProductCode" },
+        "rule_version": { "$ref": "#/definitions/RuleVersionNumber" },
+        "inputs": { "$ref": "#/definitions/RatingInputs" },
+        "sum_insured": { "$ref": "#/definitions/PositiveMoney" },
+        "premium": { "$ref": "#/definitions/PositiveMoney" },
+        "currency": { "type": "string", "const": "INR" },
+        "actor_id": { "$ref": "#/definitions/ActorId" },
+        "created_at": { "$ref": "#/definitions/DateTime" }
+      }
+    },
+
+    "Application": {
+      "description": "applications (status projection). Raw Aadhaar/PAN and health declarations are never stored.",
+      "type": "object",
+      "additionalProperties": false,
+      "x-table": "applications",
+      "x-append-only": false,
+      "required": ["id", "quote_id", "product", "rule_version", "customer_id", "full_name", "date_of_birth", "address", "aadhaar_masked", "pan_masked", "kyc_status", "status", "status_history", "created_at", "updated_at"],
+      "properties": {
+        "id": { "$ref": "#/definitions/Uuid" },
+        "quote_id": { "$ref": "#/definitions/Uuid" },
+        "product": { "$ref": "#/definitions/ProductCode" },
+        "rule_version": { "$ref": "#/definitions/RuleVersionNumber" },
+        "customer_id": { "$ref": "#/definitions/ActorId" },
+        "full_name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "date_of_birth": { "$ref": "#/definitions/Date" },
+        "address": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "aadhaar_masked": { "$ref": "#/definitions/AadhaarMasked" },
+        "pan_masked": { "$ref": "#/definitions/PanMasked" },
+        "kyc_status": { "type": "string", "enum": ["VERIFIED"] },
+        "status": { "$ref": "#/definitions/ApplicationStatus" },
+        "status_history": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/ApplicationStatus" }
+        },
+        "created_at": { "$ref": "#/definitions/DateTime" },
+        "updated_at": { "$ref": "#/definitions/DateTime" }
+      }
+    },
+
+    "UnderwritingDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-table": "underwriting_decisions",
+      "x-append-only": true,
+      "required": ["id", "application_id", "decision", "reason_codes", "product", "rule_version", "decided_by", "comment", "created_at"],
+      "properties": {
+        "id": { "$ref": "#/definitions/Uuid" },
+        "application_id": { "$ref": "#/definitions/Uuid" },
+        "decision": { "$ref": "#/definitions/Decision" },
+        "reason_codes": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/definitions/ReasonCode" } },
+        "product": { "$ref": "#/definitions/ProductCode" },
+        "rule_version": { "$ref": "#/definitions/RuleVersionNumber" },
+        "decided_by": { "$ref": "#/definitions/ActorId" },
+        "comment": { "type": ["string", "null"], "maxLength": 500 },
+        "created_at": { "$ref": "#/definitions/DateTime" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "decision": { "enum": ["MANUAL_REVIEW", "DECLINE"] } } },
+          "then": { "properties": { "reason_codes": { "minItems": 1 } } }
+        }
+      ]
+    },
+
+    "UnderwritingOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-table": "underwriting_overrides",
+      "x-append-only": true,
+      "required": ["id", "application_id", "overridden_decision_id", "from_status", "to_status", "reason_code", "comment", "actor_id", "created_at"],
+      "properties": {
+        "id": { "$ref": "#/definitions/Uuid" },
+        "application_id": { "$ref": "#/definitions/Uuid" },
+        "overridden_decision_id": { "$ref": "#/definitions/Uuid" },
+        "from_status": { "type": "string", "const": "DECLINED" },
+        "to_status": { "type": "string", "const": "AUTO_BIND" },
+        "reason_code": { "$ref": "#/definitions/ReasonCode" },
+        "comment": { "type": "string", "minLength": 10, "maxLength": 500 },
+        "actor_id": { "$ref": "#/definitions/ActorId" },
+        "created_at": { "$ref": "#/definitions/DateTime" }
+      }
+    },
+
+    "Policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-table": "policies",
+      "x-append-only": false,
+      "required": ["id", "policy_number", "product", "application_id", "customer_id", "rule_version", "rating_inputs", "sum_insured", "premium", "currency", "effective_date", "expiry_date", "premium_due_date", "status", "address", "nominees", "previous_policy_number", "created_at", "updated_at"],
+      "properties": {
+        "id": { "$ref": "#/definitions/Uuid" },
+        "policy_number": { "$ref": "#/definitions/PolicyNumber" },
+        "product": { "$ref": "#/definitions/ProductCode" },
+        "application_id": { "$ref": "#/definitions/Uuid" },
+        "customer_id": { "$ref": "#/definitions/ActorId" },
+        "rule_version": { "$ref": "#/definitions/RuleVersionNumber" },
+        "rating_inputs": { "$ref": "#/definitions/RatingInputs" },
+        "sum_insured": { "$ref": "#/definitions/PositiveMoney" },
+        "premium": { "$ref": "#/definitions/PositiveMoney" },
+        "currency": { "type": "string", "const": "INR" },
+        "effective_date": { "$ref": "#/definitions/Date" },
+        "expiry_date": { "$ref": "#/definitions/Date" },
+        "premium_due_date": { "$ref": "#/definitions/Date" },
+        "status": { "$ref": "#/definitions/PolicyStatus" },
+        "address": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "nominees": { "type": "array", "items": { "$ref": "#/definitions/Nominee" } },
+        "previous_policy_number": {
+          "oneOf": [ { "$ref": "#/definitions/PolicyNumber" }, { "type": "null" } ]
+        },
+        "created_at": { "$ref": "#/definitions/DateTime" },
+        "updated_at": { "$ref": "#/definitions/DateTime" }
+      }
+    },
+
+    "PolicyStateTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-table": "policy_state_transitions",
+      "x-append-only": true,
+      "required": ["id", "policy_id", "from_status", "to_status", "reason", "actor_id", "occurred_at"],
+      "properties": {
+        "id": { "$ref": "#/definitions/Uuid" },
+        "policy_id": { "$ref": "#/definitions/Uuid" },
+        "from_status": { "oneOf": [ { "$ref": "#/definitions/PolicyStatus" }, { "type": "null" } ] },
+        "to_status": { "$ref": "#/definitions/PolicyStatus" },
+        "reason": {
+          "type": "string",
+          "pattern": "^(ISSUED|RENEWAL_ISSUED|RENEWED|GRACE_PERIOD_EXPIRED|ENDORSEMENT:(CHANGE_ADDRESS|ADD_NOMINEE|CHANGE_SUM_INSURED)|CANCELLED:.{1,200})$"
+        },
+        "actor_id": { "$ref": "#/definitions/ActorId" },
+        "occurred_at": { "$ref": "#/definitions/DateTime" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "from_status": { "type": "null" } } },
+          "then": { "properties": { "to_status": { "const": "ACTIVE" } } }
+        }
+      ]
+    },
+
+    "Endorsement": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-table": "endorsements",
+      "x-append-only": true,
+      "required": ["id", "policy_id", "type", "before", "after", "premium_delta", "rule_version", "endorsement_date", "actor_id", "created_at"],
+      "properties": {
+        "id": { "$ref": "#/definitions/Uuid" },
+        "policy_id": { "$ref": "#/definitions/Uuid" },
+        "type": { "$ref": "#/definitions/EndorsementType" },
+        "before": { "type": "object" },
+        "after": { "type": "object" },
+        "premium_delta": { "$ref": "#/definitions/Money" },
+        "rule_version": { "$ref": "#/definitions/RuleVersionNumber" },
+        "endorsement_date": { "$ref": "#/definitions/Date" },
+        "actor_id": { "$ref": "#/definitions/ActorId" },
+        "created_at": { "$ref": "#/definitions/DateTime" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "enum": ["CHANGE_ADDRESS", "ADD_NOMINEE"] } } },
+          "then": { "properties": { "premium_delta": { "const": "0.00" } } }
+        }
+      ]
+    },
+
+    "PremiumPayment": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-table": "premium_payments",
+      "x-append-only": true,
+      "required": ["id", "policy_id", "due_date", "amount", "rule_version", "actor_id", "paid_at"],
+      "properties": {
+        "id": { "$ref": "#/definitions/Uuid" },
+        "policy_id": { "$ref": "#/definitions/Uuid" },
+        "due_date": { "$ref": "#/definitions/Date" },
+        "amount": { "$ref": "#/definitions/PositiveMoney" },
+        "rule_version": { "$ref": "#/definitions/RuleVersionNumber" },
+        "actor_id": { "$ref": "#/definitions/ActorId" },
+        "paid_at": { "$ref": "#/definitions/DateTime" }
+      }
+    },
+
+    "Refund": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-table": "refunds",
+      "x-append-only": true,
+      "required": ["id", "policy_id", "refund_type", "premium_paid", "term_days", "days_elapsed", "unused_days", "admin_fee", "amount", "rule_version", "cancellation_date", "reason", "actor_id", "created_at"],
+      "properties": {
+        "id": { "$ref": "#/definitions/Uuid" },
+        "policy_id": { "$ref": "#/definitions/Uuid" },
+        "refund_type": { "$ref": "#/definitions/RefundType" },
+        "premium_paid": { "$ref": "#/definitions/PositiveMoney" },
+        "term_days": { "type": "integer", "minimum": 1 },
+        "days_elapsed": { "type": "integer", "minimum": 0 },
+        "unused_days": { "type": "integer", "minimum": 0 },
+        "admin_fee": { "$ref": "#/definitions/NonNegativeMoney" },
+        "amount": { "$ref": "#/definitions/NonNegativeMoney" },
+        "rule_version": { "$ref": "#/definitions/RuleVersionNumber" },
+        "cancellation_date": { "$ref": "#/definitions/Date" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "actor_id": { "$ref": "#/definitions/ActorId" },
+        "created_at": { "$ref": "#/definitions/DateTime" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "refund_type": { "const": "FREE_LOOK" } } },
+          "then": { "properties": { "admin_fee": { "const": "0.00" } } }
+        }
+      ]
+    },
+
+    "AuditRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-table": "audit_records",
+      "x-append-only": true,
+      "required": ["id", "actor_id", "actor_role", "action", "entity_type", "entity_id", "detail", "correlation_id", "created_at"],
+      "properties": {
+        "id": { "$ref": "#/definitions/Uuid" },
+        "actor_id": { "$ref": "#/definitions/ActorId" },
+        "actor_role": { "$ref": "#/definitions/ActorRole" },
+        "action": { "$ref": "#/definitions/AuditAction" },
+        "entity_type": { "$ref": "#/definitions/AuditEntityType" },
+        "entity_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "detail": { "type": ["object", "null"] },
+        "correlation_id": { "type": ["string", "null"], "maxLength": 64 },
+        "created_at": { "$ref": "#/definitions/DateTime" }
+      }
+    }
+  },
+  "properties": {
+    "rule_set_versions": { "type": "array", "items": { "$ref": "#/definitions/RuleSetVersion" } },
+    "quotes": { "type": "array", "items": { "$ref": "#/definitions/Quote" } },
+    "applications": { "type": "array", "items": { "$ref": "#/definitions/Application" } },
+    "underwriting_decisions": { "type": "array", "items": { "$ref": "#/definitions/UnderwritingDecision" } },
+    "underwriting_overrides": { "type": "array", "items": { "$ref": "#/definitions/UnderwritingOverride" } },
+    "policies": { "type": "array", "items": { "$ref": "#/definitions/Policy" } },
+    "policy_state_transitions": { "type": "array", "items": { "$ref": "#/definitions/PolicyStateTransition" } },
+    "endorsements": { "type": "array", "items": { "$ref": "#/definitions/Endorsement" } },
+    "premium_payments": { "type": "array", "items": { "$ref": "#/definitions/PremiumPayment" } },
+    "refunds": { "type": "array", "items": { "$ref": "#/definitions/Refund" } },
+    "audit_records": { "type": "array", "items": { "$ref": "#/definitions/AuditRecord" } }
+  },
+  "additionalProperties": false
+}
