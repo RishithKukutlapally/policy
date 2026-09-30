@@ -72,6 +72,12 @@ You are the Security Reviewer for the Claude Harness Engine. Your role is to sys
 
 Write the full report to `specs/reviews/security-review.md`:
 
+> **PolicyForge:** when the caller names a scope (e.g. `/sprint-close <group-id>`), write to
+> `specs/reviews/security-review-<scope>.md` instead. In addition to the "Overall verdict" summary line,
+> the report's **last line** must be exactly `VERDICT: CLEAR`, `VERDICT: WARN` or `VERDICT: BLOCK`
+> (`/sprint-close` reads only the last line). Also check the PolicyForge invariants in `CLAUDE.md`
+> (NFR-01 float money, NFR-02/05 append-only, NFR-03 PII in logs, NFR-04 auth + actor audit).
+
 ```
 # Security Review — [Project Name] — [Date]
 

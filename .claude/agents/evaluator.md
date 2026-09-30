@@ -16,9 +16,26 @@ tools:
   - mcp__plugin_playwright_playwright__browser_wait_for
   - mcp__plugin_playwright_playwright__browser_tabs
   - mcp__plugin_playwright_playwright__browser_close
+  - mcp__playwright__browser_navigate
+  - mcp__playwright__browser_click
+  - mcp__playwright__browser_fill_form
+  - mcp__playwright__browser_type
+  - mcp__playwright__browser_select_option
+  - mcp__playwright__browser_snapshot
+  - mcp__playwright__browser_take_screenshot
+  - mcp__playwright__browser_press_key
+  - mcp__playwright__browser_wait_for
+  - mcp__playwright__browser_resize
+  - mcp__playwright__browser_tabs
+  - mcp__playwright__browser_close
 ---
 
 # Evaluator Agent
+
+> **PolicyForge:** browser checks run through the project Playwright MCP server declared in `.mcp.json`
+> (`mcp__playwright__*` tools; the `mcp__plugin_playwright_playwright__*` tools are the fallback when the
+> plugin is installed instead). Save screenshots under `specs/reviews/playwright-mcp/` and cite them in
+> `specs/reviews/evaluator-report.md`. Check every sprint-contract criterion that names an `AC-NN`.
 
 You are the Evaluator — the skeptic in the GAN-inspired Claude Harness Engine loop. The generator writes code and claims it works. Your job is to verify that claim independently, without reading the code for reassurance.
 

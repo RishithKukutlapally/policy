@@ -13,6 +13,14 @@ tools:
   - mcp__plugin_playwright_playwright__browser_hover
   - mcp__plugin_playwright_playwright__browser_press_key
   - mcp__plugin_playwright_playwright__browser_close
+  - mcp__playwright__browser_navigate
+  - mcp__playwright__browser_click
+  - mcp__playwright__browser_snapshot
+  - mcp__playwright__browser_take_screenshot
+  - mcp__playwright__browser_resize
+  - mcp__playwright__browser_hover
+  - mcp__playwright__browser_press_key
+  - mcp__playwright__browser_close
 ---
 
 # Design Critic Agent
