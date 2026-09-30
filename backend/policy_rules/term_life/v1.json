@@ -1,0 +1,58 @@
+{
+  "product": "TERM_LIFE",
+  "version": 1,
+  "status": "PUBLISHED",
+  "effective_from": "2026-01-01",
+  "currency": "INR",
+  "premium": {
+    "base_rate": "0.0015",
+    "minimum_premium": "3000.00",
+    "factors": {
+      "age_bands": [
+        { "min": 18, "max": 30, "multiplier": "1.00" },
+        { "min": 31, "max": 40, "multiplier": "1.20" },
+        { "min": 41, "max": 50, "multiplier": "1.60" },
+        { "min": 51, "max": 60, "multiplier": "2.20" }
+      ],
+      "term_years_bands": [
+        { "min": 5, "max": 15, "multiplier": "1.00" },
+        { "min": 16, "max": 25, "multiplier": "1.10" },
+        { "min": 26, "max": 30, "multiplier": "1.25" }
+      ],
+      "smoker_loading": "0.50"
+    }
+  },
+  "eligibility": {
+    "min_age": 18,
+    "max_age": 60,
+    "min_sum_insured": "500000.00",
+    "max_sum_insured": "50000000.00"
+  },
+  "underwriting": {
+    "rules": [
+      { "when": "age_at_term_end > 75", "decision": "DECLINE", "reason_code": "TL-UW-001" },
+      { "when": "sum_insured > 10000000", "decision": "MANUAL_REVIEW", "reason_code": "TL-UW-002" },
+      { "when": "has_pre_existing_condition == true", "decision": "MANUAL_REVIEW", "reason_code": "TL-UW-003" }
+    ],
+    "reason_codes": {
+      "TL-UW-001": "Age at end of term exceeds 75",
+      "TL-UW-002": "Sum insured above automatic acceptance limit",
+      "TL-UW-003": "Pre-existing medical condition declared",
+      "TL-UW-900": "Underwriter approved",
+      "TL-UW-901": "Admin override: risk accepted",
+      "TL-UW-902": "Underwriter declined"
+    }
+  },
+  "endorsement": {
+    "allowed_types": ["CHANGE_ADDRESS", "ADD_NOMINEE", "CHANGE_SUM_INSURED"]
+  },
+  "renewal": {
+    "term_months": 12,
+    "grace_period_days": 30
+  },
+  "cancellation": {
+    "method": "PRO_RATA",
+    "free_look_days": 15,
+    "admin_fee": "250.00"
+  }
+}

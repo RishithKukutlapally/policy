@@ -1,0 +1,69 @@
+{
+  "product": "MOTOR",
+  "version": 1,
+  "status": "PUBLISHED",
+  "effective_from": "2026-01-01",
+  "currency": "INR",
+  "premium": {
+    "base_rate": "0.0310",
+    "minimum_premium": "2500.00",
+    "factors": {
+      "vehicle_age_bands": [
+        { "min": 0, "max": 5, "multiplier": "1.00" },
+        { "min": 6, "max": 10, "multiplier": "1.15" },
+        { "min": 11, "max": 15, "multiplier": "1.35" },
+        { "min": 16, "max": 99, "multiplier": "1.60" }
+      ],
+      "engine_cc_bands": [
+        { "min": 0, "max": 1000, "multiplier": "1.00" },
+        { "min": 1001, "max": 1500, "multiplier": "1.10" },
+        { "min": 1501, "max": 99999, "multiplier": "1.25" }
+      ],
+      "ncb_discounts": {
+        "0": "0.00",
+        "20": "0.20",
+        "25": "0.25",
+        "35": "0.35",
+        "45": "0.45",
+        "50": "0.50"
+      },
+      "zone_rates": {
+        "A": "1.05",
+        "B": "1.00"
+      }
+    }
+  },
+  "eligibility": {
+    "min_age": 18,
+    "max_age": 75,
+    "min_sum_insured": "100000.00",
+    "max_sum_insured": "5000000.00"
+  },
+  "underwriting": {
+    "rules": [
+      { "when": "vehicle_age_years > 15", "decision": "DECLINE", "reason_code": "MO-UW-001" },
+      { "when": "vehicle_age_years > 10", "decision": "MANUAL_REVIEW", "reason_code": "MO-UW-002" },
+      { "when": "sum_insured > 2500000", "decision": "MANUAL_REVIEW", "reason_code": "MO-UW-003" }
+    ],
+    "reason_codes": {
+      "MO-UW-001": "Vehicle older than 15 years",
+      "MO-UW-002": "Vehicle older than 10 years",
+      "MO-UW-003": "Sum insured above automatic acceptance limit",
+      "MO-UW-900": "Underwriter approved",
+      "MO-UW-901": "Admin override: risk accepted",
+      "MO-UW-902": "Underwriter declined"
+    }
+  },
+  "endorsement": {
+    "allowed_types": ["CHANGE_ADDRESS", "ADD_NOMINEE", "CHANGE_SUM_INSURED"]
+  },
+  "renewal": {
+    "term_months": 12,
+    "grace_period_days": 30
+  },
+  "cancellation": {
+    "method": "PRO_RATA",
+    "free_look_days": 15,
+    "admin_fee": "250.00"
+  }
+}

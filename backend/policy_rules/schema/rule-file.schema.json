@@ -1,0 +1,218 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://policyforge.horizon.example/schema/rule-file.schema.json",
+  "title": "PolicyForge product rule file",
+  "description": "Versioned product rule set. All money and rate values are JSON strings so they load losslessly into decimal.Decimal (NFR-01).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "product",
+    "version",
+    "status",
+    "effective_from",
+    "currency",
+    "premium",
+    "eligibility",
+    "underwriting",
+    "endorsement",
+    "renewal",
+    "cancellation"
+  ],
+  "properties": {
+    "product": { "enum": ["TERM_LIFE", "MOTOR", "HOUSEHOLD"] },
+    "version": { "type": "integer", "minimum": 1 },
+    "status": { "enum": ["DRAFT", "PUBLISHED"] },
+    "effective_from": { "type": "string", "format": "date", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "currency": { "enum": ["INR"] },
+    "premium": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base_rate", "minimum_premium", "factors"],
+      "properties": {
+        "base_rate": { "$ref": "#/definitions/decimalString" },
+        "minimum_premium": { "$ref": "#/definitions/decimalString" },
+        "factors": { "type": "object", "minProperties": 1 }
+      }
+    },
+    "eligibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_age", "max_age", "min_sum_insured", "max_sum_insured"],
+      "properties": {
+        "min_age": { "type": "integer", "minimum": 0, "maximum": 120 },
+        "max_age": { "type": "integer", "minimum": 0, "maximum": 120 },
+        "min_sum_insured": { "$ref": "#/definitions/decimalString" },
+        "max_sum_insured": { "$ref": "#/definitions/decimalString" }
+      }
+    },
+    "underwriting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rules", "reason_codes"],
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["when", "decision", "reason_code"],
+            "properties": {
+              "when": { "type": "string", "minLength": 1 },
+              "decision": { "enum": ["AUTO_BIND", "MANUAL_REVIEW", "DECLINE"] },
+              "reason_code": { "$ref": "#/definitions/reasonCode" }
+            }
+          }
+        },
+        "reason_codes": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "$ref": "#/definitions/reasonCode" },
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "endorsement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed_types"],
+      "properties": {
+        "allowed_types": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["CHANGE_ADDRESS", "ADD_NOMINEE", "CHANGE_SUM_INSURED"] }
+        }
+      }
+    },
+    "renewal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["term_months", "grace_period_days"],
+      "properties": {
+        "term_months": { "type": "integer", "minimum": 1 },
+        "grace_period_days": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "cancellation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "free_look_days", "admin_fee"],
+      "properties": {
+        "method": { "enum": ["PRO_RATA"] },
+        "free_look_days": { "type": "integer", "minimum": 0 },
+        "admin_fee": { "$ref": "#/definitions/decimalString" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "product": { "const": "TERM_LIFE" } }, "required": ["product"] },
+      "then": {
+        "properties": {
+          "premium": {
+            "properties": {
+              "factors": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["age_bands", "smoker_loading", "term_years_bands"],
+                "properties": {
+                  "age_bands": { "$ref": "#/definitions/bands" },
+                  "term_years_bands": { "$ref": "#/definitions/bands" },
+                  "smoker_loading": { "$ref": "#/definitions/decimalString" }
+                }
+              }
+            }
+          },
+          "underwriting": {
+            "properties": {
+              "rules": { "items": { "properties": { "reason_code": { "pattern": "^TL-UW-\\d{3}$" } } } },
+              "reason_codes": { "propertyNames": { "pattern": "^TL-UW-\\d{3}$" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "product": { "const": "MOTOR" } }, "required": ["product"] },
+      "then": {
+        "properties": {
+          "premium": {
+            "properties": {
+              "factors": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["vehicle_age_bands", "engine_cc_bands", "ncb_discounts", "zone_rates"],
+                "properties": {
+                  "vehicle_age_bands": { "$ref": "#/definitions/bands" },
+                  "engine_cc_bands": { "$ref": "#/definitions/bands" },
+                  "ncb_discounts": { "$ref": "#/definitions/rateMap" },
+                  "zone_rates": { "$ref": "#/definitions/rateMap" }
+                }
+              }
+            }
+          },
+          "underwriting": {
+            "properties": {
+              "rules": { "items": { "properties": { "reason_code": { "pattern": "^MO-UW-\\d{3}$" } } } },
+              "reason_codes": { "propertyNames": { "pattern": "^MO-UW-\\d{3}$" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "product": { "const": "HOUSEHOLD" } }, "required": ["product"] },
+      "then": {
+        "properties": {
+          "premium": {
+            "properties": {
+              "factors": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["construction_type_rates", "flood_zone_loading", "security_discount"],
+                "properties": {
+                  "construction_type_rates": { "$ref": "#/definitions/rateMap" },
+                  "flood_zone_loading": { "$ref": "#/definitions/decimalString" },
+                  "security_discount": { "$ref": "#/definitions/decimalString" }
+                }
+              }
+            }
+          },
+          "underwriting": {
+            "properties": {
+              "rules": { "items": { "properties": { "reason_code": { "pattern": "^HH-UW-\\d{3}$" } } } },
+              "reason_codes": { "propertyNames": { "pattern": "^HH-UW-\\d{3}$" } }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "decimalString": {
+      "type": "string",
+      "pattern": "^\\d+(\\.\\d+)?$",
+      "description": "Non-negative decimal written as a string, never a JSON number (NFR-01)."
+    },
+    "reasonCode": { "type": "string", "pattern": "^(TL|MO|HH)-UW-\\d{3}$" },
+    "bands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["min", "max", "multiplier"],
+        "properties": {
+          "min": { "type": "integer", "minimum": 0 },
+          "max": { "type": "integer", "minimum": 0 },
+          "multiplier": { "$ref": "#/definitions/decimalString" }
+        }
+      }
+    },
+    "rateMap": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/definitions/decimalString" }
+    }
+  }
+}

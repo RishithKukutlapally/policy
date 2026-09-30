@@ -1,0 +1,52 @@
+{
+  "product": "HOUSEHOLD",
+  "version": 1,
+  "status": "PUBLISHED",
+  "effective_from": "2026-01-01",
+  "currency": "INR",
+  "premium": {
+    "base_rate": "0.0008",
+    "minimum_premium": "1500.00",
+    "factors": {
+      "construction_type_rates": {
+        "CONCRETE": "0.90",
+        "BRICK": "1.00",
+        "TIMBER": "1.30",
+        "THATCH": "1.80"
+      },
+      "flood_zone_loading": "0.25",
+      "security_discount": "0.10"
+    }
+  },
+  "eligibility": {
+    "min_age": 18,
+    "max_age": 80,
+    "min_sum_insured": "500000.00",
+    "max_sum_insured": "20000000.00"
+  },
+  "underwriting": {
+    "rules": [
+      { "when": "construction_type == THATCH", "decision": "DECLINE", "reason_code": "HH-UW-001" },
+      { "when": "in_flood_zone == true and sum_insured > 5000000", "decision": "MANUAL_REVIEW", "reason_code": "HH-UW-002" }
+    ],
+    "reason_codes": {
+      "HH-UW-001": "Thatch construction is not insurable",
+      "HH-UW-002": "High sum insured in a flood zone",
+      "HH-UW-900": "Underwriter approved",
+      "HH-UW-901": "Admin override: risk accepted",
+      "HH-UW-902": "Underwriter declined"
+    }
+  },
+  "endorsement": {
+    "allowed_types": ["CHANGE_ADDRESS", "ADD_NOMINEE", "CHANGE_SUM_INSURED"]
+  },
+  "renewal": {
+    "term_months": 12,
+    "grace_period_days": 30
+  },
+  "cancellation": {
+    "method": "PRO_RATA",
+    "free_look_days": 15,
+    "admin_fee": "250.00"
+  }
+}
