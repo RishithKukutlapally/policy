@@ -1,0 +1,9 @@
+- navigation "Main navigation":
+  - paragraph: Customer
+  - list:
+    - listitem:
+      - link "Get a Quote":
+        - /url: /quote
+    - listitem:
+      - link "My Policies":
+        - /url: /policies

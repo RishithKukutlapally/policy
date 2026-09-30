@@ -1,0 +1,15 @@
+- paragraph: Term Life
+- paragraph: "1"
+- paragraph: active policies
+- paragraph: Motor
+- paragraph: "4"
+- paragraph: active policies
+- paragraph: Household
+- paragraph: "1"
+- paragraph: active policies
+- paragraph: Premium collected
+- paragraph: /₹\d+,\d+,\d+\.\d+/
+- paragraph: all premium payments
+- paragraph: Refunds paid
+- paragraph: /₹\d+,\d+\.\d+/
+- paragraph: all refunds
