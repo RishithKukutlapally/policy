@@ -1,0 +1,147 @@
+{
+  "group": "S2",
+  "stories": ["E3-S1", "E4-S1", "E3-S2", "E3-S3", "E4-S2", "E4-S3", "E4-S4", "E4-S5"],
+  "features": [
+    "F049", "F050", "F051", "F052", "F053", "F054", "F055", "F056", "F057", "F058",
+    "F059", "F060", "F061", "F062", "F063", "F064", "F065", "F066", "F067", "F068",
+    "F069", "F070", "F071", "F072", "F073", "F074", "F075", "F076", "F077", "F078",
+    "F079", "F080", "F081", "F082", "F083", "F084", "F085", "F086", "F087", "F088",
+    "F089", "F090", "F091", "F092", "F093", "F094"
+  ],
+  "contract": {
+    "api_checks": [
+      {
+        "id": "S2-API-01",
+        "method": "POST",
+        "path": "/api/quotes",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "body": { "product": "MOTOR", "inputs": { "sum_insured": "500000.00", "owner_age": 35, "vehicle_age_years": 3, "engine_cc": 1200, "zone": "A", "ncb_percent": "20" } },
+        "expected_status": 201,
+        "expected_body": { "premium": "14322.00", "rule_version": 1 },
+        "description": "AC-01 — deterministic premium from the active versioned rule file"
+      },
+      {
+        "id": "S2-API-02",
+        "method": "POST",
+        "path": "/api/quotes",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "body": { "product": "MOTOR", "inputs": { "sum_insured": "50000.00", "owner_age": 35, "vehicle_age_years": 3, "engine_cc": 1200, "zone": "A", "ncb_percent": "20" } },
+        "expected_status": 422,
+        "expected_body": { "error": { "code": "VALIDATION_ERROR" } },
+        "description": "AC-12 — input outside eligibility returns field-level errors and persists nothing"
+      },
+      {
+        "id": "S2-API-03",
+        "method": "POST",
+        "path": "/api/applications",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "body": { "quote_id": "{{quote_id}}", "kyc": { "full_name": "Test Customer 01", "date_of_birth": "1991-04-02", "aadhaar": "999900000001", "pan": "AAAAA0001A", "address": "1 Sample Street, Testville 560001" } },
+        "expected_status": 201,
+        "description": "AC-03 — application captures the KYC stub, validates against the rule set and progresses to underwriting"
+      },
+      {
+        "id": "S2-API-04",
+        "method": "GET",
+        "path": "/api/underwriting/queue?status=MANUAL_REVIEW",
+        "headers": { "X-Actor-Id": "uw-001", "X-Actor-Role": "UNDERWRITER" },
+        "expected_status": 200,
+        "description": "AC-04 / AC-14 — manual review queue lists cases with their reason codes"
+      },
+      {
+        "id": "S2-API-05",
+        "method": "POST",
+        "path": "/api/underwriting/applications/{{application_id}}/decision",
+        "headers": { "X-Actor-Id": "uw-001", "X-Actor-Role": "UNDERWRITER" },
+        "body": { "decision": "APPROVE", "reason_codes": ["MO-UW-900"], "comment": "Inspection report satisfactory" },
+        "expected_status": 200,
+        "description": "AC-14 — underwriter decision is recorded and audited with the actor id"
+      },
+      {
+        "id": "S2-API-06",
+        "method": "POST",
+        "path": "/api/underwriting/applications/{{declined_application_id}}/override",
+        "headers": { "X-Actor-Id": "admin-001", "X-Actor-Role": "ADMIN" },
+        "body": { "reason_code": "TL-UW-901", "comment": "Risk accepted after manual inspection" },
+        "expected_status": 200,
+        "description": "AC-09 — admin override of a DECLINE with reason code and comment, audited"
+      },
+      {
+        "id": "S2-API-07",
+        "method": "POST",
+        "path": "/api/underwriting/applications/{{application_id}}/override",
+        "headers": { "X-Actor-Id": "uw-001", "X-Actor-Role": "UNDERWRITER" },
+        "body": { "reason_code": "MO-UW-901", "comment": "Not permitted for this role" },
+        "expected_status": 403,
+        "expected_body": { "error": { "code": "FORBIDDEN" } },
+        "description": "AC-22 — only an ADMIN may override a DECLINE"
+      },
+      {
+        "id": "S2-API-08",
+        "method": "GET",
+        "path": "/api/quotes/{{quote_id}}/reprice",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "expected_status": 200,
+        "expected_body": { "stored_premium": "14322.00", "recomputed_premium": "14322.00", "matches": true },
+        "description": "AC-13 — repricing the same quote on its recorded rule version reproduces the premium"
+      }
+    ],
+    "playwright_checks": [
+      {
+        "id": "S2-UI-01",
+        "description": "AC-01 — Get a Quote returns the premium computed from the active rule version",
+        "url": "http://localhost:3000/quote",
+        "steps": [
+          { "action": "goto", "value": "http://localhost:3000/quote" },
+          { "action": "select", "selector": "[data-testid='quote-product']", "value": "MOTOR" },
+          { "action": "fill", "selector": "[data-testid='quote-sum-insured']", "value": "500000" },
+          { "action": "click", "selector": "[data-testid='quote-submit']" },
+          { "action": "expect_text", "selector": "[data-testid='quote-premium']", "assertion": "shows the premium and the rule version used" }
+        ]
+      },
+      {
+        "id": "S2-UI-02",
+        "description": "AC-03 / AC-04 — Apply submits KYC and shows the underwriting outcome with reason codes",
+        "url": "http://localhost:3000/apply",
+        "steps": [
+          { "action": "goto", "value": "http://localhost:3000/apply" },
+          { "action": "fill", "selector": "[data-testid='kyc-pan']", "value": "AAAAA0001A" },
+          { "action": "click", "selector": "[data-testid='apply-submit']" },
+          { "action": "expect_visible", "selector": "[data-testid='application-status']", "assertion": "AUTO_BIND, MANUAL_REVIEW or DECLINE with reason codes" }
+        ]
+      },
+      {
+        "id": "S2-UI-03",
+        "description": "AC-09 / AC-14 — Underwriter Workbench decision and audited admin override",
+        "url": "http://localhost:3000/underwriting",
+        "steps": [
+          { "action": "goto", "value": "http://localhost:3000/underwriting" },
+          { "action": "expect_visible", "selector": "[data-testid='queue-table']" },
+          { "action": "click", "selector": "[data-testid='case-open']" },
+          { "action": "click", "selector": "[data-testid='decision-approve']" },
+          { "action": "expect_visible", "selector": "[data-testid='audit-trail']", "assertion": "audit entry shows the acting user" }
+        ]
+      }
+    ],
+    "design_checks": {
+      "visual_hierarchy": { "required": true, "min_score": 6 },
+      "accessibility": { "required": true, "min_score": 6 },
+      "responsiveness": { "required": true, "min_score": 6 },
+      "interaction_feedback": { "required": false, "min_score": 4 }
+    },
+    "performance_checks": [
+      { "endpoint": "/api/quotes", "method": "POST", "max_response_time_ms": 2000 }
+    ],
+    "architecture_checks": {
+      "layering": {
+        "required": true,
+        "description": "import-linter contracts still KEPT; the new domain modules (premium_calculator, condition, term_days, application_validator, underwriting_rules) import only src.types and the standard library — no framework, no logging, no clock"
+      },
+      "typing": { "required": true, "description": "uv run mypy src/ clean; zero any in the new frontend code" },
+      "folder_structure": { "required": true, "description": "matches specs/design/component-map.md rows for E3-* and E4-*" },
+      "env_vars": { "required": true, "description": "no new secrets; business date only via the business_date setting" },
+      "migrations": { "required": true, "description": "single Alembic head; new revisions for quotes, applications, underwriting_decisions and underwriting_overrides are append-only and never edit an earlier revision" }
+    }
+  },
+  "approved": true,
+  "notes": "Sprint 2 of 4. Delivers the quote engine (AC-01, AC-12, AC-13), application intake with the KYC stub (AC-03), the underwriting decision matrix with reason codes (AC-04), the manual review queue and underwriter decision (AC-14) and the audited admin override of a DECLINE (AC-09). All money is Decimal, quantized once with ROUND_HALF_UP (NFR-01); decisions, overrides and audit rows are append-only (NFR-02); no PII reaches logs (NFR-03); every mutating action is audited with the actor id (NFR-04). TDD: failing test commit before implementation for every story."
+}
