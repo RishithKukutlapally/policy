@@ -1,0 +1,23 @@
+{
+  "name": "policyforge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PolicyForge — policy issuance and lifecycle management for Horizon Insurance",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node scripts/start.mjs",
+    "dev:api": "node scripts/start.mjs --api-only",
+    "dev:ui": "node scripts/start.mjs --ui-only",
+    "migrate": "node scripts/start.mjs --migrate-only",
+    "test:backend": "node scripts/start.mjs --test",
+    "e2e": "playwright test --config e2e/playwright.config.ts",
+    "e2e:update": "playwright test --config e2e/playwright.config.ts --update-snapshots",
+    "e2e:report": "playwright show-report e2e/playwright-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}
