@@ -6,15 +6,17 @@ The project follows a strict layered architecture. Dependencies flow **downward 
 
 ```
 ┌─────────────┐
-│     UI      │  ← Layer 6 (highest)
+│     UI      │  ← Layer 7 (highest)
 ├─────────────┤
-│     API     │  ← Layer 5
+│     API     │  ← Layer 6
 ├─────────────┤
-│   Service   │  ← Layer 4
+│   Service   │  ← Layer 5
 ├─────────────┤
-│ Repository  │  ← Layer 3
+│ Repository  │  ← Layer 4
 ├─────────────┤
-│   Config    │  ← Layer 2
+│   Config    │  ← Layer 3
+├─────────────┤
+│   Domain    │  ← Layer 2 (PolicyForge: pure business rules)
 ├─────────────┤
 │    Types    │  ← Layer 1 (lowest)
 └─────────────┘
@@ -25,11 +27,17 @@ The project follows a strict layered architecture. Dependencies flow **downward 
 | Layer | Responsibility | May Import From |
 |-------|---------------|-----------------|
 | Types | Domain models, interfaces, enums, shared type definitions | (none) |
-| Config | Environment variables, feature flags, constants, app configuration | Types |
+| Domain *(PolicyForge)* | Pure business rules: premium, underwriting, state machine, endorsement, renewal, refund | Types |
+| Config | Environment variables, feature flags, constants, app configuration, rule-file loading | Types, Domain |
 | Repository | Data access, persistence, external data sources | Types, Config |
-| Service | Business logic, domain rules, orchestration | Types, Config, Repository |
-| API | Route handlers, request/response mapping, middleware, validation | Types, Config, Repository, Service |
+| Service | Business logic orchestration, transactions, audit | Types, Domain, Config, Repository |
+| API | Route handlers, request/response mapping, middleware, validation | Types, Config, Service (not Repository) |
 | UI | Components, pages, client-side state, rendering | Types, Config, Service, API |
+| Lib *(cross-cutting)* | Logger with PII masking, correlation id | standard library only — importable by every layer |
+
+> **PolicyForge:** backend layers live in `backend/src/<layer>/` and import as `from src.<layer> ...`.
+> The canonical rules are in `docs/conventions.md` ("Layer import rules") and are enforced by
+> import-linter contracts, `backend/tests/architecture/`, and the `check-architecture` / `pre-commit-gate` hooks.
 
 ## One-Way Dependency Rule
 
@@ -109,3 +117,9 @@ Example override:
 ```
 
 When `project-manifest.json` is present, the `check-architecture` hook reads layer definitions from it instead of using the defaults above.
+
+> **PolicyForge note:** the shipped `check-architecture`, `pre-commit-gate` and `task-completed` hooks do
+> **not** read the manifest — they hard-code the layer list. PolicyForge updated that list to
+> `types → domain → config → repository → service → api` plus explicit extra rules
+> (repository ↛ domain, api ↛ repository/domain) to match `docs/conventions.md`; the manifest's `layers`
+> block documents the same order for other tooling.

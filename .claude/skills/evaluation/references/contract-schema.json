@@ -22,6 +22,18 @@
       "items": { "type": "string" },
       "minItems": 1
     },
+    "approved": {
+      "type": "boolean",
+      "description": "Human approval gate — the sprint-contract-gate hook blocks the build until this is true."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Free-text summary of the sprint's scope and the ACs/NFRs it delivers."
+    },
+    "business_date": {
+      "type": "string",
+      "description": "Optional POLICYFORGE_BUSINESS_DATE (YYYY-MM-DD) the checks must run under, for criteria that are only reachable inside a renewal or grace window."
+    },
     "contract": {
       "type": "object",
       "description": "Verification checklist for the sprint",

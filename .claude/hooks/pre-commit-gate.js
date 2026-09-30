@@ -6,7 +6,10 @@ const fs = require('fs');
 const path = require('path');
 
 // Layer order from lowest to highest
-const LAYERS = ['types', 'config', 'repository', 'service', 'api'];
+// PolicyForge adds the Domain layer (pure business rules) between Types and Config — see project-manifest.json "layers".
+const LAYERS = ['types', 'domain', 'config', 'repository', 'service', 'api'];
+// PolicyForge rules beyond rank order (docs/conventions.md): repository may not import domain; api may not import repository or domain.
+const EXTRA_FORBIDDEN = { repository: ['domain'], api: ['repository', 'domain'] };
 
 function getLayer(filePath) {
   const normalized = filePath.replace(/\\/g, '/');
@@ -50,7 +53,7 @@ function checkArchitectureViolations(pyFiles) {
     const currentLayer = getLayer(filePath);
     if (!currentLayer) continue;
 
-    const higherLayers = getHigherLayers(currentLayer);
+    const higherLayers = getHigherLayers(currentLayer).concat(EXTRA_FORBIDDEN[currentLayer] || []);
     if (higherLayers.length === 0) continue;
 
     let content;
@@ -110,7 +113,7 @@ function findProjectDir(startDir) {
 const scriptDir = path.dirname(path.resolve(__filename));
 const projectDir = findProjectDir(scriptDir) || process.cwd();
 
-const srcDir = path.join(projectDir, 'src');
+const srcDir = (fs.existsSync(path.join(projectDir, 'backend', 'src')) ? path.join(projectDir, 'backend', 'src') : path.join(projectDir, 'src'));
 
 if (!fs.existsSync(srcDir)) {
   process.exit(0);
