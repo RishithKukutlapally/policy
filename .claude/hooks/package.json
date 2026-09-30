@@ -1,0 +1,6 @@
+{
+  "name": "policyforge-hooks",
+  "private": true,
+  "type": "commonjs",
+  "description": "Scopes .claude/hooks/**/*.js to CommonJS. The repository root package.json sets \"type\": \"module\" (needed by scripts/start.mjs and the Playwright config), which would otherwise make every .js file here an ES module and break `require` — the hooks then exit non-zero and FAIL OPEN, silently disabling every domain-invariant guard. Node resolves module type from the nearest package.json, so this file confines the root setting. See docs/knowledge-deposits.md KD-013."
+}

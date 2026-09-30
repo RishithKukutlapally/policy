@@ -2,6 +2,7 @@
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
+  "enabledMcpjsonServers": ["playwright"],
   "enabledPlugins": {
     "code-review@claude-plugins-official": true,
     "commit-commands@claude-plugins-official": true,
@@ -48,7 +49,42 @@
           {
             "type": "command",
             "command": "node .claude/hooks/enforce-length-pre.js",
-            "timeout": 5000
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/premium-precision-check.js\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/policy-immutability-check.js\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pii-redaction-check.js\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/append-only-repository-check.js\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/shell-immutability-check.js\"",
+            "timeout": 10
           }
         ]
       }
@@ -60,47 +96,47 @@
           {
             "type": "command",
             "command": "node .claude/hooks/scope-directory.js",
-            "timeout": 5000
+            "timeout": 5
           },
           {
             "type": "command",
             "command": "node .claude/hooks/protect-env.js",
-            "timeout": 5000
+            "timeout": 5
           },
           {
             "type": "command",
             "command": "node .claude/hooks/detect-secrets.js",
-            "timeout": 5000
+            "timeout": 5
           },
           {
             "type": "command",
             "command": "node .claude/hooks/lint-on-save.js",
-            "timeout": 15000
+            "timeout": 15
           },
           {
             "type": "command",
             "command": "node .claude/hooks/typecheck.js",
-            "timeout": 30000
+            "timeout": 30
           },
           {
             "type": "command",
             "command": "node .claude/hooks/check-architecture.js",
-            "timeout": 5000
+            "timeout": 5
           },
           {
             "type": "command",
             "command": "node .claude/hooks/check-function-length.js",
-            "timeout": 5000
+            "timeout": 5
           },
           {
             "type": "command",
             "command": "node .claude/hooks/check-file-length.js",
-            "timeout": 5000
+            "timeout": 5
           },
           {
             "type": "command",
             "command": "node .claude/hooks/track-writes.js",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       },
@@ -110,12 +146,12 @@
           {
             "type": "command",
             "command": "node .claude/hooks/pre-commit-gate.js",
-            "timeout": 30000
+            "timeout": 30
           },
           {
             "type": "command",
             "command": "node .claude/hooks/sprint-contract-gate.js",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       }
@@ -126,7 +162,7 @@
           {
             "type": "command",
             "command": "node .claude/hooks/require-review.js",
-            "timeout": 10000
+            "timeout": 10
           }
         ]
       }
@@ -137,7 +173,7 @@
           {
             "type": "command",
             "command": "node .claude/hooks/task-completed.js",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       }
@@ -148,7 +184,7 @@
           {
             "type": "command",
             "command": "node .claude/hooks/teammate-idle-check.js",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       }
