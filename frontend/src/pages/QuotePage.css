@@ -1,0 +1,79 @@
+/* Get a Quote (story E3-S3) — layout only, built from the shared tokens in styles/index.css. */
+.quote-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 1rem;
+  align-items: start;
+}
+.quote-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1rem;
+}
+.quote-form .field--full,
+.quote-form .field--checkbox {
+  grid-column: 1 / -1;
+}
+.quote-fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+  margin: 0 0 1rem;
+  min-width: 0;
+}
+.quote-fieldset legend {
+  padding: 0 0.3rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.quote-input,
+.quote-select {
+  font: inherit;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--text);
+  width: 100%;
+  min-width: 0;
+}
+.quote-input[aria-invalid='true'],
+.quote-select[aria-invalid='true'] {
+  border: 2px solid var(--danger);
+}
+.field-error {
+  color: var(--danger);
+  font-size: 0.84rem;
+  font-weight: 600;
+  margin: 0;
+}
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.2rem 0;
+}
+.choice input {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin: 0;
+}
+.quote-premium {
+  font-size: 2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin: 0.2rem 0;
+}
+.quote-loading {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  color: var(--muted);
+}
+
+@media (max-width: 767.98px) {
+  .quote-layout,
+  .quote-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

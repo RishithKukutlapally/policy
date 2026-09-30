@@ -1,0 +1,13 @@
+/* Workbench (story E4-S5) — queue beside the case detail, stacked below 768 px (AC-24). */
+.wb-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 767.98px) {
+  .wb-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

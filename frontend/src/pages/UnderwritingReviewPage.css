@@ -1,0 +1,14 @@
+/* Underwriting Review (story E4-S5) — single queue column plus the override dialog (AC-09, AC-24). */
+.review-filter {
+  min-width: 14rem;
+}
+
+@media (max-width: 767.98px) {
+  .review-filter {
+    min-width: 0;
+    width: 100%;
+  }
+  .dlg {
+    max-width: calc(100vw - 1.5rem);
+  }
+}

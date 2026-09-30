@@ -1,0 +1,39 @@
+/* Apply (story E4-S5) — layout only, built from the shared tokens in styles/index.css. */
+.apply-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 1rem;
+  align-items: start;
+}
+.apply-side {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1rem;
+}
+.form-grid .full {
+  grid-column: 1 / -1;
+}
+.apply-fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+  margin: 1rem 0 0;
+  min-width: 0;
+}
+.apply-fieldset legend {
+  padding: 0 0.3rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 767.98px) {
+  .apply-layout,
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

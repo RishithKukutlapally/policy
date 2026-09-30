@@ -1,0 +1,123 @@
+/* Shared underwriting UI (story E4-S5) — queue cards, reason lists, audit timeline and the decision
+   form. Built from the tokens in styles/index.css; the shared stylesheet is not edited. */
+
+.queue-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+.queue-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 0.7rem 0.8rem;
+}
+.queue-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+.queue-card-actions {
+  margin-top: 0.5rem;
+}
+.cell-actions {
+  white-space: nowrap;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.big-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.7rem;
+}
+.badge-secondary {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 0.12rem 0.45rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: 4px;
+}
+
+.reason-list {
+  margin: 0.3rem 0 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.92rem;
+}
+
+.timeline {
+  margin: 0.3rem 0 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.92rem;
+}
+
+.decision-box {
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  padding: 0.8rem;
+}
+.decision-box fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.7rem;
+  min-width: 0;
+}
+.decision-box legend {
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0 0.3rem;
+}
+.counter {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.alert-info {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.7rem;
+}
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+/* Inputs used by the underwriting screens; the shared sheet styles only .quote-* controls. */
+.uw-scope input[type='text'],
+.uw-scope input[type='date'],
+.uw-scope input[type='password'],
+.uw-scope select,
+.uw-scope textarea {
+  font: inherit;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--text);
+  width: 100%;
+  min-width: 0;
+}
+.uw-scope input[aria-invalid='true'],
+.uw-scope textarea[aria-invalid='true'] {
+  border: 2px solid var(--danger);
+}
+.uw-scope .choice input {
+  width: 1.05rem;
+  height: 1.05rem;
+}
