@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Renew policy · Run end-of-day · PolicyForge mockup E7-S4</title>
+<!--
+  PolicyForge UI mockup E7-S4 · Renew policy · Run end-of-day
+  Self-contained: all CSS/JS inline, no external requests, no real API calls (fixtures only).
+  Field names follow the "API endpoints" table + request/response notes in docs/conventions.md and the
+  owning feature spec (specs/design/api-contracts.md did not exist when this mockup was written).
+  Every interactive element carries data-api="<METHOD> <path>" and a visible caption.
+  The dashed "Mockup" bar at the top of <main> is NOT part of the product: it toggles happy/empty/error states.
+  Responsive: breakpoint 768px. Below it the side nav collapses behind the "Open navigation" button and
+  tables (.rtable) render as stacked cards.
+  Story E7-S4 (AC-07, AC-17, AC-18, AC-22, NFR-04). Two screens:
+    #renew  /policies/MO-2026-000001/renew   CUSTOMER (owner)  business date 2027-02-15 (renewal window opened 2027-01-29 = expiry 2027-02-28 - 30 days)
+            GET  /api/policies/{policy_number}/renewal  -> 200 {renewable, renewal_premium, rule_version, due_date, grace_end_date, paid}
+            POST /api/policies/{policy_number}/payments {amount} -> 201 {payment_id, amount, due_date, rule_version, paid_at}
+            POST /api/policies/{policy_number}/renew    -> 201 successor {policy_number, effective_date, expiry_date, premium, status: "ACTIVE", previous_policy_number}
+    #eod    /admin/end-of-day (control)      ADMIN
+            POST /api/admin/end-of-day {as_of} -> 200 {as_of, renewed, lapsed, in_grace, not_renewable, failed, renewed_policies[{from, to}], lapsed_policies[], failed_policies[]}
+            One AuditRecord RUN_END_OF_DAY per run (actor admin-001). Re-running the same as_of returns all zeros.
+  Renewal premium "15500.00" (MOTOR 500000.00, factors unchanged after vehicle_age_years + 1), due 2027-03-01, grace end 2027-03-31.
+  Errors: 422 RENEWAL_PREMIUM_UNPAID, 409 OUTSIDE_RENEWAL_WINDOW (business date 2026-12-01), 409 INVALID_POLICY_STATE (CANCELLED policy),
+          422 VALIDATION_ERROR for a malformed as_of.
+  ASSUMED: successor number MO-2027-000001 (year of the renewal run, next sequence); successor expiry 2028-02-29 (12 months - 1 day);
+           route /admin/end-of-day for the admin control (no nav item is defined for it in E1-S5 — reached from the Portfolio page / home tile);
+           failed_policies[] items {policy_number, error}.
+-->
+<style>
+:root{
+  --bg:#f5f6f8;--surface:#ffffff;--surface-2:#f0f2f5;--border:#d5dae1;--border-strong:#aeb6c1;
+  --text:#1b2330;--muted:#4f5967;--accent:#1d4f8f;--accent-hover:#163e71;--accent-soft:#e7eef8;
+  --danger:#9b1c1c;--danger-soft:#fbeaea;--ok:#1d5b34;--ok-soft:#e5f3ea;--warn:#734700;--warn-soft:#fff3dc;
+  --violet:#4a2d86;--violet-soft:#efeaf9;--focus:#1d4f8f;
+  --font:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono","SFMono-Regular",Consolas,monospace;
+  --radius:6px;--nav-w:232px;--header-h:56px;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{font-size:15px;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.45;overflow-x:hidden}
+h1{font-size:1.45rem;margin:0 0 .25rem;font-weight:650;letter-spacing:-.01em}
+h2{font-size:1.1rem;margin:0 0 .75rem;font-weight:650}
+h3{font-size:.98rem;margin:0 0 .5rem;font-weight:650}
+p{margin:0 0 .75rem}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;overflow-wrap:anywhere}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:3px}
+.skip{position:absolute;left:-9999px;top:0;background:var(--surface);padding:.5rem 1rem;z-index:50}
+.skip:focus{left:.5rem;top:.5rem}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ---------- header ---------- */
+.topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
+  min-height:var(--header-h);padding:.5rem 1rem;background:#1f2733;color:#f4f6f9;border-bottom:1px solid #111821}
+.brand{font-weight:700;letter-spacing:.01em;font-size:1.05rem;color:#fff;text-decoration:none;margin-right:auto}
+.brand small{font-weight:400;color:#c4ccd7;margin-left:.4rem;font-size:.8rem}
+.menu-btn{display:none;align-items:center;gap:.4rem;background:transparent;color:#fff;border:1px solid #6b7686;
+  border-radius:var(--radius);padding:.4rem .6rem;font:inherit;cursor:pointer}
+.menu-btn:focus-visible,.role select:focus-visible{outline-color:#9cc2ff}
+.role{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.role label{font-size:.82rem;color:#d8dee7}
+.role select{font:inherit;padding:.35rem .5rem;border-radius:var(--radius);border:1px solid #6b7686;background:#fff;color:var(--text)}
+.hdrs{font-family:var(--mono);font-size:.75rem;color:#d8dee7;background:#2c3645;border-radius:4px;padding:.2rem .45rem}
+
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:var(--nav-w) minmax(0,1fr);min-height:calc(100vh - var(--header-h))}
+.sidenav{background:var(--surface);border-right:1px solid var(--border);padding:1rem .75rem}
+.sidenav ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.15rem}
+.sidenav a{display:block;padding:.55rem .7rem;border-radius:var(--radius);color:var(--text);text-decoration:none}
+.sidenav a:hover{background:var(--surface-2)}
+.sidenav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent);font-weight:650;box-shadow:inset 3px 0 0 var(--accent)}
+.nav-caption{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 .5rem .7rem}
+main{padding:1.25rem 1.5rem 3rem;min-width:0}
+main:focus{outline:none}
+
+/* ---------- mockup bar (not product UI) ---------- */
+.mock-bar{border:1px dashed var(--border-strong);background:#fbfbfc;border-radius:var(--radius);padding:.5rem .7rem;margin-bottom:1.1rem;
+  display:flex;flex-wrap:wrap;gap:.4rem .6rem;align-items:center;font-size:.82rem;color:var(--muted)}
+.mock-tag{font-family:var(--mono);font-weight:700;color:var(--text)}
+.mock-bar .grp{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}
+.mock-bar button{font:inherit;font-size:.78rem;padding:.2rem .5rem;border:1px solid var(--border-strong);background:#fff;border-radius:4px;cursor:pointer;color:var(--text)}
+.mock-bar button[aria-pressed="true"]{background:#1f2733;color:#fff;border-color:#1f2733}
+.req-log{flex-basis:100%;font-family:var(--mono);font-size:.74rem;color:var(--muted);overflow-wrap:anywhere;white-space:pre-wrap;margin:0}
+
+/* ---------- building blocks ---------- */
+.page-head{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:flex-end;justify-content:space-between;margin-bottom:1rem}
+.route{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;margin-bottom:1rem;min-width:0}
+.panel > h2:first-child,.panel > h3:first-child{margin-top:0}
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.75rem}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.8rem .9rem}
+.stat .lbl{font-size:.8rem;color:var(--muted);margin:0}
+.stat .val{font-size:1.4rem;font-weight:650;margin:.1rem 0 0;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:.84rem}
+.row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.stack>*+*{margin-top:.75rem}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:.35rem 1rem;margin:0}
+.kv dt{color:var(--muted);font-size:.86rem}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.api{display:block;font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-top:.25rem;overflow-wrap:anywhere}
+.api::before{content:"\21B3  "}
+.api-inline{font-family:var(--mono);font-size:.72rem;color:var(--muted);overflow-wrap:anywhere}
+
+/* ---------- forms ---------- */
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.9rem 1rem}
+.form-grid .full{grid-column:1/-1}
+.field{display:flex;flex-direction:column;gap:.25rem;min-width:0}
+.field label,.field legend,.lbl-strong{font-weight:600;font-size:.9rem}
+.field .hint{font-size:.78rem;color:var(--muted)}
+.field .fname{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+input[type=text],input[type=date],input[type=number],input[type=password],select,textarea{
+  font:inherit;padding:.5rem .6rem;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff;color:var(--text);width:100%;min-width:0}
+textarea{min-height:5rem;resize:vertical}
+textarea.code{font-family:var(--mono);font-size:.8rem;min-height:14rem}
+input[aria-invalid="true"],select[aria-invalid="true"],textarea[aria-invalid="true"]{border:2px solid var(--danger)}
+.err{color:var(--danger);font-size:.84rem;font-weight:600}
+.err::before{content:"Error: "}
+fieldset{border:1px solid var(--border);border-radius:var(--radius);padding:.6rem .8rem;margin:0;min-width:0}
+fieldset legend{padding:0 .3rem}
+.choice{display:flex;align-items:center;gap:.45rem;padding:.2rem 0}
+.choice input{width:1.05rem;height:1.05rem;margin:0}
+.seg{display:flex;flex-wrap:wrap;gap:.4rem}
+.seg label{display:flex;align-items:center;gap:.4rem;border:1px solid var(--border-strong);border-radius:var(--radius);padding:.45rem .7rem;cursor:pointer;background:#fff}
+.seg input:checked + span{font-weight:650}
+.seg label:has(input:checked){border:2px solid var(--accent);background:var(--accent-soft)}
+
+/* ---------- buttons ---------- */
+.btn{font:inherit;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:.5rem .95rem;border-radius:var(--radius);
+  border:1px solid var(--border-strong);background:#fff;color:var(--text);cursor:pointer;text-decoration:none;min-height:2.4rem}
+.btn:hover{background:var(--surface-2)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn-danger:hover{background:#7e1616}
+.btn-sm{padding:.25rem .6rem;min-height:2rem;font-size:.86rem}
+.btn[disabled],.btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
+.actions{display:flex;flex-wrap:wrap;gap:.6rem;align-items:flex-start;margin-top:1rem}
+.act{display:flex;flex-direction:column}
+
+/* ---------- alerts ---------- */
+.alert{border:1px solid;border-left-width:5px;border-radius:var(--radius);padding:.7rem .9rem;margin-bottom:1rem}
+.alert p:last-child,.alert ul:last-child{margin-bottom:0}
+.alert strong.code{font-family:var(--mono)}
+.alert-error{background:var(--danger-soft);border-color:var(--danger);color:#5f1111}
+.alert-ok{background:var(--ok-soft);border-color:var(--ok);color:#123d22}
+.alert-info{background:var(--accent-soft);border-color:var(--accent);color:#12335e}
+.alert-warn{background:var(--warn-soft);border-color:var(--warn);color:#4d3000}
+.empty{border:1px dashed var(--border-strong);border-radius:var(--radius);padding:1.2rem;text-align:center;color:var(--muted);background:#fbfbfc}
+.loading{display:flex;gap:.5rem;align-items:center;color:var(--muted)}
+.spinner{width:1rem;height:1rem;border:2px solid var(--border-strong);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation:none}}
+
+/* ---------- status badges (text, never colour alone) ---------- */
+.badge{display:inline-flex;align-items:center;gap:.3rem;font-family:var(--mono);font-size:.74rem;font-weight:700;letter-spacing:.03em;
+  padding:.12rem .45rem;border-radius:4px;border:1px solid;white-space:nowrap;background:var(--surface-2);color:var(--text);border-color:var(--border-strong)}
+.badge::before{content:"";width:.45rem;height:.45rem;border-radius:50%;background:currentColor;flex:none}
+.b-ACTIVE,.b-AUTO_BIND,.b-PUBLISHED,.b-PAID,.b-ISSUED{background:var(--ok-soft);color:var(--ok);border-color:#8fc4a1}
+.b-ENDORSED,.b-SUBMITTED,.b-UNDERWRITING{background:var(--accent-soft);color:var(--accent);border-color:#98b5dc}
+.b-LAPSED,.b-MANUAL_REVIEW,.b-UNPAID,.b-IN_GRACE{background:var(--warn-soft);color:var(--warn);border-color:#d9b36a}
+.b-CANCELLED,.b-DECLINE,.b-DECLINED{background:var(--danger-soft);color:var(--danger);border-color:#dc9c9c}
+.b-RENEWED{background:var(--violet-soft);color:var(--violet);border-color:#b7a6dc}
+.b-DRAFT{background:#fff;color:var(--muted);border-style:dashed}
+.b-DRAFT::before{background:transparent;border:1.5px solid currentColor}
+.b-Active{background:#1f2733;color:#fff;border-color:#1f2733}
+.b-CANCELLED::before,.b-DECLINE::before,.b-DECLINED::before{border-radius:1px}
+.b-LAPSED::before,.b-MANUAL_REVIEW::before,.b-UNPAID::before{border-radius:0;transform:rotate(45deg)}
+
+/* ---------- responsive tables → stacked cards ---------- */
+.rtable{width:100%;border-collapse:collapse;background:var(--surface);font-size:.92rem}
+.rtable caption{text-align:left;font-weight:650;padding:0 0 .5rem}
+.rtable th,.rtable td{padding:.55rem .65rem;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+.rtable thead th{background:var(--surface-2);font-size:.8rem;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.04em}
+.rtable tbody tr.selectable{cursor:pointer}
+.rtable tbody tr.selectable:hover,.rtable tbody tr[aria-selected="true"]{background:#f6f9fd}
+.table-wrap{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.table-wrap .rtable tr:last-child td{border-bottom:0}
+
+/* ---------- dialog ---------- */
+dialog{border:1px solid var(--border);border-radius:8px;padding:0;width:min(540px,calc(100vw - 24px));max-height:calc(100vh - 24px);color:var(--text)}
+dialog::backdrop{background:rgba(20,26,36,.55)}
+dialog .dlg-body{padding:1.1rem 1.2rem}
+dialog .dlg-foot{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:flex-end;padding:.8rem 1.2rem;border-top:1px solid var(--border);background:var(--surface-2)}
+
+.timeline{list-style:none;margin:0;padding:0 0 0 .9rem;border-left:2px solid var(--border)}
+.timeline li{position:relative;padding:0 0 .8rem .6rem}
+.timeline li::before{content:"";position:absolute;left:-1.28rem;top:.35rem;width:.6rem;height:.6rem;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+
+/* ---------- breakpoint: 768px ---------- */
+@media (max-width:767.98px){
+  .menu-btn{display:inline-flex}
+  .hdrs{display:none}
+  .brand small{display:none}
+  .layout{display:block}
+  .sidenav{display:none;position:absolute;left:0;right:0;z-index:25;border-right:0;border-bottom:1px solid var(--border);box-shadow:0 8px 20px rgba(0,0,0,.12)}
+  .sidenav.open{display:block}
+  main{padding:1rem .9rem 3rem}
+  .grid-2,.form-grid{grid-template-columns:minmax(0,1fr)}
+  .kv{grid-template-columns:minmax(0,1fr)}
+  .kv dd{margin-bottom:.35rem}
+  .table-wrap{border:0;overflow:visible}
+  .rtable,.rtable tbody,.rtable tr,.rtable td{display:block;width:100%}
+  .rtable thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  .rtable tr{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.65rem;padding:.35rem .2rem}
+  .rtable td{border:0;display:grid;grid-template-columns:minmax(6.5rem,40%) minmax(0,1fr);gap:.5rem;padding:.35rem .6rem}
+  .rtable td::before{content:attr(data-label);font-size:.78rem;color:var(--muted);font-weight:600}
+  .rtable td.cell-actions{grid-template-columns:minmax(0,1fr)}
+  .rtable td.cell-actions::before{display:none}
+  .rtable .num{white-space:normal}
+  .btn{min-height:2.75rem}
+}
+.renew-figure{font-size:1.8rem;font-weight:700;font-variant-numeric:tabular-nums;margin:.1rem 0 .4rem}
+.counts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.6rem}
+@media (max-width:767.98px){.counts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+</head>
+<body data-story="E7-S4">
+<a class="skip" href="#main">Skip to main content</a>
+<header class="topbar">
+  <button type="button" class="menu-btn" id="nav-toggle" aria-label="Open navigation" aria-controls="sidenav" aria-expanded="false" data-testid="nav-toggle">
+    <span aria-hidden="true">&#9776;</span><span aria-hidden="true">Menu</span>
+  </button>
+  <a class="brand" href="index.html">PolicyForge <small>Horizon Insurance</small></a>
+  <div class="role">
+    <label for="role-switcher">Demo user</label>
+    <select id="role-switcher" data-testid="role-switcher">
+      <option value="CUSTOMER">Customer (cust-001)</option>
+      <option value="UNDERWRITER">Underwriter (uw-001)</option>
+      <option value="ADMIN">Admin (admin-001)</option>
+    </select>
+    <code class="hdrs" id="hdrs" title="Auth-stub headers sent by the API client"></code>
+  </div>
+</header>
+<div class="layout">
+  <nav id="sidenav" class="sidenav" aria-label="Main navigation" data-testid="side-nav">
+    <p class="nav-caption" id="nav-caption">Customer</p>
+    <ul id="nav-list"></ul>
+  </nav>
+  <main id="main" tabindex="-1">
+    <section class="mock-bar" aria-label="Mockup state controls (not part of the product)">
+      <span class="mock-tag">MOCKUP E7-S4</span>
+      <a href="index.html">All mockups</a>
+      <span class="grp" role="group" aria-label="Screen">Screen:
+  <button type="button" data-goto-screen="renew" aria-pressed="false">Renew (Customer)</button>
+  <button type="button" data-goto-screen="eod" aria-pressed="false">Run end-of-day (Admin)</button>
+</span>
+<span class="grp" role="group" aria-label="Renewal state">Renew:
+  <button type="button" data-set-state="rn:window" data-default aria-pressed="true">In window (2027-02-15)</button>
+  <button type="button" data-set-state="rn:outside" aria-pressed="false">Outside window (2026-12-01)</button>
+  <button type="button" data-set-state="rn:cancelled" aria-pressed="false">CANCELLED policy (409)</button>
+</span>
+<span class="grp" role="group" aria-label="End-of-day examples">EOD:
+  <button type="button" id="ex-eod">Run 2027-01-15</button>
+  <button type="button" id="ex-fail">Run with a failure</button>
+  <button type="button" id="ex-bad">422 malformed as_of</button>
+</span>
+      <p class="req-log" id="req-log" aria-live="polite">No request sent yet.</p>
+    </section>
+    <section id="not-authorised" class="panel" hidden data-testid="not-authorised">
+      <h1>Not authorised</h1>
+      <p>The selected demo user's role cannot open this screen. Switch the demo user in the header.</p>
+      <p class="api">API would answer 403 FORBIDDEN · {"error": {"code": "FORBIDDEN", "message": "Role not allowed on the route", "details": null}}</p>
+    </section>
+    <!-- ===================== RENEW (CUSTOMER) ===================== -->
+    <div class="screen" data-screen="renew" data-roles="CUSTOMER" data-route="/policies">
+      <p><a href="E5-S3.html#detail">&larr; Back to Policy Detail</a></p>
+      <div class="page-head">
+        <div>
+          <h1>Renew MO-2026-000001 <span id="old-badge"><span class="badge b-ACTIVE" data-testid="status-badge">ACTIVE</span></span></h1>
+          <p class="route">Route: /policies/MO-2026-000001/renew · business date <span id="bizdate">2027-02-15</span></p>
+        </div>
+      </div>
+      <div id="rn-cancelled" data-when="rn:cancelled" hidden>
+        <div class="alert alert-error" role="alert" data-testid="renewal-error">
+          <p><strong class="code">409 INVALID_POLICY_STATE</strong> — this policy is <strong>CANCELLED</strong> and cannot be renewed. <code>details: {"current": "CANCELLED", "target": "RENEWED"}</code></p>
+          <a href="E5-S3.html">Back to My Policies</a>
+        </div>
+      </div>
+      <div data-when="rn:window rn:outside">
+        <div class="grid-2">
+          <section class="panel" aria-labelledby="rq-h">
+            <h2 id="rq-h">Renewal quote</h2>
+            <span class="api" style="margin:-.5rem 0 .6rem">GET /api/policies/MO-2026-000001/renewal</span>
+            <p class="muted small" style="margin:0">Renewal premium (12 months)</p>
+            <p class="renew-figure" data-testid="renewal-premium">₹15,500.00</p>
+            <dl class="kv">
+              <dt>Rule version</dt><dd>v1 (active version)</dd>
+              <dt>Due date</dt><dd class="num" data-testid="due-date">2027-03-01</dd>
+              <dt>Grace period ends</dt><dd class="num" data-testid="grace-end-date">2027-03-31</dd>
+              <dt>Renewal window</dt><dd class="num">opens 2027-01-29</dd>
+              <dt>Payment</dt><dd id="paid-badge"><span class="badge b-UNPAID" data-testid="payment-status">UNPAID</span></dd>
+            </dl>
+            <div id="rn-alert" style="margin-top:1rem"></div>
+            <div class="actions">
+              <div class="act">
+                <button type="button" class="btn btn-primary" id="pay-btn" data-testid="pay-premium" data-api="POST /api/policies/{policy_number}/payments">Pay premium</button>
+                <span class="api">POST /api/policies/MO-2026-000001/payments {"amount": "15500.00"}</span>
+              </div>
+              <div class="act">
+                <button type="button" class="btn" id="renew-btn" data-testid="renew-now" data-api="POST /api/policies/{policy_number}/renew">Renew now</button>
+                <span class="api">POST /api/policies/MO-2026-000001/renew</span>
+              </div>
+            </div>
+          </section>
+          <section class="panel" aria-labelledby="cur-h">
+            <h2 id="cur-h">Current term</h2>
+            <dl class="kv">
+              <dt>Product</dt><dd>Motor · rule version v1</dd>
+              <dt>Sum insured</dt><dd class="num">₹5,00,000.00</dd>
+              <dt>Premium</dt><dd class="num">₹15,500.00</dd>
+              <dt>Term</dt><dd class="num">2026-03-01 – 2027-02-28</dd>
+            </dl>
+            <p class="small muted" style="margin-top:.8rem">Pay before the due date and your policy renews automatically at end of day, or choose "Renew now" once paid. If unpaid, cover continues until the grace period ends and the policy then lapses.</p>
+            <div id="successor" hidden aria-live="polite"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== RUN END-OF-DAY (ADMIN) ===================== -->
+    <div class="screen" data-screen="eod" data-roles="ADMIN" data-route="/admin/portfolio">
+      <div class="page-head">
+        <div>
+          <h1>Run end-of-day</h1>
+          <p class="route">Route: /admin/end-of-day · renews paid policies, lapses unpaid ones after grace</p>
+        </div>
+      </div>
+      <section class="panel" aria-labelledby="eod-h">
+        <h2 id="eod-h">Run</h2>
+        <form id="eod-form" class="row" novalidate style="align-items:flex-end">
+          <div class="field" style="min-width:12rem">
+            <label for="as_of">As of</label>
+            <input type="date" id="as_of" name="as_of" data-testid="eod-as-of">
+          </div>
+          <div class="act">
+            <button type="submit" class="btn btn-primary" data-testid="run-eod" data-api="POST /api/admin/end-of-day">Run end-of-day</button>
+            <span class="api">POST /api/admin/end-of-day {"as_of": "YYYY-MM-DD"}</span>
+          </div>
+        </form>
+        <div id="eod-alert" style="margin-top:1rem"></div>
+      </section>
+      <section class="panel" aria-labelledby="res-h" aria-live="polite">
+        <h2 id="res-h">Result</h2>
+        <div id="eod-empty" class="empty">No run yet in this session.</div>
+        <div id="eod-result" hidden data-testid="eod-result"></div>
+      </section>
+    </div>
+  </main>
+</div>
+<div id="live" class="sr-only" aria-live="polite"></div>
+<script>
+"use strict";
+/* ---------------- shared mockup shell (identical in every mockup) ---------------- */
+const PF = (() => {
+  const ACTORS = { CUSTOMER: "cust-001", UNDERWRITER: "uw-001", ADMIN: "admin-001" };
+  const NAV = {
+    CUSTOMER: [["Get a Quote", "E3-S3.html", "/quote"], ["My Policies", "E5-S3.html", "/policies"]],
+    UNDERWRITER: [["Workbench", "E4-S5.html#workbench", "/underwriter/queue"]],
+    ADMIN: [["Product Catalog", "E2-S4.html", "/admin/catalog"], ["Underwriting Review", "E4-S5.html#review", "/admin/underwriting"], ["Portfolio", "E9-S2.html", "/admin/portfolio"]]
+  };
+  const CAPTION = { CUSTOMER: "Customer", UNDERWRITER: "Underwriter", ADMIN: "Admin" };
+  const KEY = "policyforge.demoRole";
+  const sel = document.getElementById("role-switcher");
+  const nav = document.getElementById("sidenav");
+  const toggle = document.getElementById("nav-toggle");
+  let activeRoute = window.PF_ACTIVE_ROUTE || "";
+  let currentScreen = null;
+  /* Display-only formatting of decimal strings. The UI never does money arithmetic (NFR-01). */
+  const INR = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  function inr(s) { return INR.format(Number(s)); }
+  function signedInr(s) { return (String(s).startsWith("-") ? "−" : "+") + INR.format(Math.abs(Number(s))); }
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "3b1f6f0e-8a4c-4d8e-9a7b-0c2d4e6f8a10";
+  }
+  function role() { return sel.value; }
+  function headers() { return { "X-Actor-Id": ACTORS[role()], "X-Actor-Role": role(), "X-Correlation-ID": uuid() }; }
+  function badge(status, label) {
+    const s = document.createElement("span");
+    s.className = "badge b-" + status; s.textContent = label || status; s.setAttribute("data-testid", "status-badge");
+    return s;
+  }
+  function badgeHtml(status, label) { return '<span class="badge b-' + status + '" data-testid="status-badge">' + (label || status) + "</span>"; }
+  /* Records the request the real API client would send (no network). Never pass raw PII here. */
+  function log(method, path, body, status) {
+    const h = headers();
+    const txt = method + " " + path + (status ? "  → " + status : "") + "\n" +
+      "X-Actor-Id: " + h["X-Actor-Id"] + "  X-Actor-Role: " + h["X-Actor-Role"] + "  X-Correlation-ID: " + h["X-Correlation-ID"] +
+      (body ? "\nbody: " + JSON.stringify(body) : "");
+    document.getElementById("req-log").textContent = txt;
+    return h;
+  }
+  function announce(msg) { const l = document.getElementById("live"); l.textContent = ""; setTimeout(() => { l.textContent = msg; }, 30); }
+  function renderNav(r) {
+    const ul = document.getElementById("nav-list"); ul.innerHTML = "";
+    document.getElementById("nav-caption").textContent = CAPTION[r];
+    NAV[r].forEach(([label, href, route]) => {
+      const li = document.createElement("li"); const a = document.createElement("a");
+      a.href = href; a.textContent = label; a.dataset.route = route; a.setAttribute("data-testid", "nav-" + route.replace(/\W+/g, "-").replace(/^-|-$/g, ""));
+      if (route === activeRoute) a.setAttribute("aria-current", "page");
+      a.addEventListener("click", () => closeNav());
+      li.appendChild(a); ul.appendChild(li);
+    });
+  }
+  function allowed(el, r) { return !el.dataset.roles || el.dataset.roles.split(" ").includes(r); }
+  function applyScreens() {
+    const screens = Array.from(document.querySelectorAll(".screen"));
+    const r = role();
+    let cur = screens.find(s => s.dataset.screen === currentScreen && allowed(s, r)) || screens.find(s => allowed(s, r)) || null;
+    screens.forEach(s => { s.hidden = s !== cur; });
+    document.getElementById("not-authorised").hidden = !!cur || screens.length === 0;
+    currentScreen = cur ? cur.dataset.screen : currentScreen;
+    if (cur && cur.dataset.route) { activeRoute = cur.dataset.route; }
+    document.querySelectorAll("[data-goto-screen]").forEach(b => b.setAttribute("aria-pressed", String(!!cur && b.dataset.gotoScreen === cur.dataset.screen)));
+    renderNav(r);
+    document.dispatchEvent(new CustomEvent("pf:screen", { detail: currentScreen }));
+  }
+  function setRole(r) {
+    sel.value = r;
+    try { localStorage.setItem(KEY, r); } catch (e) { /* storage unavailable in file:// on some browsers */ }
+    document.getElementById("hdrs").textContent = "X-Actor-Id: " + ACTORS[r] + " · X-Actor-Role: " + r;
+    applyScreens();
+    document.dispatchEvent(new CustomEvent("pf:role", { detail: r }));
+  }
+  function gotoScreen(name) {
+    currentScreen = name;
+    const s = document.querySelector('.screen[data-screen="' + name + '"]');
+    if (s && !allowed(s, role())) { setRole(s.dataset.roles.split(" ")[0]); } else { applyScreens(); }
+  }
+  function setState(group, val) {
+    document.querySelectorAll("[data-when]").forEach(el => {
+      const conds = el.dataset.when.split(" ");
+      const mine = conds.filter(c => c.startsWith(group + ":"));
+      if (mine.length) el.hidden = !mine.includes(group + ":" + val);
+    });
+    document.querySelectorAll('[data-set-state^="' + group + ':"]').forEach(b => b.setAttribute("aria-pressed", String(b.dataset.setState === group + ":" + val)));
+    document.dispatchEvent(new CustomEvent("pf:state", { detail: { group, val } }));
+  }
+  function openNav() { nav.classList.add("open"); toggle.setAttribute("aria-expanded", "true"); const f = nav.querySelector("a"); if (f) f.focus(); }
+  function closeNav() { if (!nav.classList.contains("open")) return; nav.classList.remove("open"); toggle.setAttribute("aria-expanded", "false"); }
+  function fieldError(input, msg) {
+    const id = input.id + "-error";
+    let e = document.getElementById(id);
+    if (!msg) { input.removeAttribute("aria-invalid"); if (e) e.remove(); input.setAttribute("aria-describedby", (input.dataset.hintId || "")); return; }
+    if (!e) { e = document.createElement("p"); e.id = id; e.className = "err"; e.setAttribute("data-testid", "error-" + input.id); input.insertAdjacentElement("afterend", e); }
+    e.textContent = msg;
+    input.setAttribute("aria-invalid", "true");
+    input.setAttribute("aria-describedby", ((input.dataset.hintId || "") + " " + id).trim());
+  }
+  function init() {
+    toggle.addEventListener("click", () => nav.classList.contains("open") ? closeNav() : openNav());
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && nav.classList.contains("open")) { closeNav(); toggle.focus(); } });
+    sel.addEventListener("change", () => { setRole(sel.value); announce("Demo user switched to " + sel.options[sel.selectedIndex].text); });
+    document.querySelectorAll("[data-set-state]").forEach(b => b.addEventListener("click", () => { const [g, v] = b.dataset.setState.split(":"); setState(g, v); }));
+    document.querySelectorAll("[data-goto-screen]").forEach(b => b.addEventListener("click", () => gotoScreen(b.dataset.gotoScreen)));
+    window.addEventListener("hashchange", () => { const h = location.hash.replace("#", ""); if (h && document.querySelector('.screen[data-screen="' + h + '"]')) gotoScreen(h); });
+    const hash = location.hash.replace("#", "");
+    if (hash && document.querySelector('.screen[data-screen="' + hash + '"]')) currentScreen = hash;
+    let stored = null; try { stored = localStorage.getItem(KEY); } catch (e) { stored = null; }
+    let r = ACTORS[stored] ? stored : (window.PF_DEFAULT_ROLE || "CUSTOMER");
+    const want = currentScreen && document.querySelector('.screen[data-screen="' + currentScreen + '"]');
+    if (want && !allowed(want, r)) r = want.dataset.roles.split(" ")[0];
+    else if (!want && window.PF_DEFAULT_ROLE && !stored) r = window.PF_DEFAULT_ROLE;
+    setRole(r);
+    document.querySelectorAll("[data-set-state][data-default]").forEach(b => { const [g, v] = b.dataset.setState.split(":"); setState(g, v); });
+  }
+  return { inr, signedInr, uuid, role, headers, log, badge, badgeHtml, announce, setState, setRole, gotoScreen, fieldError, init, ACTORS };
+})();
+</script>
+<script>
+"use strict";
+/* ---------------- page script: E7-S4 ---------------- */
+window.PF_ACTIVE_ROUTE = "/policies";
+const $ = id => document.getElementById(id);
+const PN = "MO-2026-000001";
+let rn = "window"; let paid = false; let renewed = false;
+function resetRenew() {
+  paid = false; renewed = false;
+  $("paid-badge").innerHTML = '<span class="badge b-UNPAID" data-testid="payment-status">UNPAID</span>';
+  $("old-badge").innerHTML = PF.badgeHtml(rn === "cancelled" ? "CANCELLED" : "ACTIVE");
+  $("rn-alert").innerHTML = ""; $("successor").hidden = true;
+  $("pay-btn").disabled = false; $("renew-btn").disabled = false;
+  $("bizdate").textContent = rn === "outside" ? "2026-12-01" : "2027-02-15";
+  PF.log("GET", "/api/policies/" + PN + "/renewal", null, rn === "cancelled" ? "409 INVALID_POLICY_STATE" : "200 {renewable: true, renewal_premium: \"15500.00\", rule_version: 1, due_date: \"2027-03-01\", grace_end_date: \"2027-03-31\", paid: false}");
+}
+function outside(path, body) {
+  PF.log("POST", path, body, "409 OUTSIDE_RENEWAL_WINDOW");
+  $("rn-alert").innerHTML = '<div class="alert alert-error" role="alert"><p><strong class="code">409 OUTSIDE_RENEWAL_WINDOW</strong> — renewal opens on 2027-01-29 (30 days before expiry). Today is 2026-12-01.</p></div>';
+}
+$("pay-btn").addEventListener("click", () => {
+  const path = "/api/policies/" + PN + "/payments"; const body = { amount: "15500.00" };
+  if (rn === "outside") return outside(path, body);
+  PF.log("POST", path, body, "201 {payment_id: \"8e4f2a6c-1b3d-4c5e-9f70-2a4b6c8d0e12\", amount: \"15500.00\", due_date: \"2027-03-01\", rule_version: 1}");
+  paid = true; $("pay-btn").disabled = true;
+  $("paid-badge").innerHTML = PF.badgeHtml("PAID") + ' <span class="small muted">15 Feb 2027 · payment 8e4f2a6c…</span>';
+  $("rn-alert").innerHTML = '<div class="alert alert-ok" role="status"><p>Renewal premium ₹15,500.00 received for the term starting 2027-03-01.</p></div>';
+  PF.announce("Payment recorded. PAID");
+});
+$("renew-btn").addEventListener("click", () => {
+  const path = "/api/policies/" + PN + "/renew";
+  if (rn === "outside") return outside(path, null);
+  if (!paid) {
+    PF.log("POST", path, null, "422 VALIDATION_ERROR RENEWAL_PREMIUM_UNPAID");
+    $("rn-alert").innerHTML = '<div class="alert alert-error" role="alert"><p><strong class="code">422 VALIDATION_ERROR</strong> — <code>RENEWAL_PREMIUM_UNPAID</code>: pay the renewal premium first.</p></div>';
+    $("pay-btn").focus(); return;
+  }
+  const succ = { policy_number: "MO-2027-000001", effective_date: "2027-03-01", expiry_date: "2028-02-29", premium: "15500.00", status: "ACTIVE", previous_policy_number: PN };
+  PF.log("POST", path, null, "201 " + JSON.stringify(succ));
+  renewed = true; $("renew-btn").disabled = true;
+  $("old-badge").innerHTML = PF.badgeHtml("RENEWED");
+  $("rn-alert").innerHTML = '<div class="alert alert-ok" role="status"><p>MO-2026-000001 is now ' + PF.badgeHtml("RENEWED") + ".</p></div>";
+  const s = $("successor");
+  s.innerHTML = '<h3 style="margin-top:1rem">New term policy</h3><dl class="kv"><dt>Policy number</dt><dd><a href="E5-S3.html#detail" data-testid="successor-link">' + succ.policy_number + "</a></dd>" +
+    "<dt>Status</dt><dd>" + PF.badgeHtml(succ.status) + "</dd><dt>Term</dt><dd class='num'>" + succ.effective_date + " – " + succ.expiry_date + "</dd>" +
+    "<dt>Premium</dt><dd class='num'>" + PF.inr(succ.premium) + "</dd><dt>Previous policy</dt><dd><code>" + succ.previous_policy_number + "</code></dd></dl>";
+  s.hidden = false; PF.announce("Renewed. New policy " + succ.policy_number);
+});
+document.addEventListener("pf:state", e => { if (e.detail.group === "rn") { rn = e.detail.val; resetRenew(); } });
+
+/* -------- End-of-day -------- */
+const runs = {};
+const FIXTURE = {
+  "2027-01-15": { renewed: 1, lapsed: 1, in_grace: 1, not_renewable: 0, failed: 0,
+    renewed_policies: [{ from: "TL-2026-000001", to: "TL-2027-000001" }], lapsed_policies: ["MO-2026-000007"], failed_policies: [] }
+};
+function localToday() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+$("as_of").value = localToday();
+let injectFailure = false;
+function stat(label, n, tid) { return '<div class="stat"><p class="lbl">' + label + '</p><p class="val" data-testid="' + tid + '">' + label + ": " + n + "</p></div>"; }
+$("eod-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const as_of = $("as_of").value.trim(); $("eod-alert").innerHTML = ""; PF.fieldError($("as_of"), null);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(as_of)) {
+    PF.log("POST", "/api/admin/end-of-day", { as_of }, "422 VALIDATION_ERROR");
+    PF.fieldError($("as_of"), "INVALID_FORMAT — use YYYY-MM-DD");
+    $("eod-alert").innerHTML = '<div class="alert alert-error" role="alert"><p><strong class="code">422 VALIDATION_ERROR</strong> — <code>as_of</code>: <code>INVALID_FORMAT</code>.</p></div>'; return;
+  }
+  const first = !runs[as_of]; runs[as_of] = (runs[as_of] || 0) + 1;
+  let r = first && FIXTURE[as_of] ? JSON.parse(JSON.stringify(FIXTURE[as_of])) : { renewed: 0, lapsed: 0, in_grace: 0, not_renewable: 0, failed: 0, renewed_policies: [], lapsed_policies: [], failed_policies: [] };
+  if (injectFailure) { r.failed = 1; r.failed_policies = [{ policy_number: "HH-2026-000004", error: "Rule version could not be loaded" }]; injectFailure = false; }
+  r = Object.assign({ as_of }, r);
+  PF.log("POST", "/api/admin/end-of-day", { as_of }, "200 " + JSON.stringify({ as_of, renewed: r.renewed, lapsed: r.lapsed, in_grace: r.in_grace, not_renewable: r.not_renewable, failed: r.failed }));
+  $("eod-result").innerHTML =
+    '<p class="small">As of <strong class="num">' + as_of + "</strong> · run " + runs[as_of] + " for this date · audited as <code>RUN_END_OF_DAY</code> by <code>" + PF.ACTORS[PF.role()] + "</code></p>" +
+    '<div class="counts">' + stat("Renewed", r.renewed, "count-renewed") + stat("Lapsed", r.lapsed, "count-lapsed") + stat("In grace", r.in_grace, "count-in-grace") + stat("Not renewable", r.not_renewable, "count-not-renewable") + stat("Failed", r.failed, "count-failed") + "</div>" +
+    (!first ? '<div class="alert alert-info" role="status" style="margin-top:1rem"><p>This date was already processed — nothing left to do (the job is idempotent).</p></div>' : "") +
+    (r.renewed_policies.length ? '<h3 style="margin-top:1rem">Renewed</h3><div class="table-wrap"><table class="rtable"><caption class="sr-only">Renewed policies</caption><thead><tr><th scope="col">Old policy</th><th scope="col">Status</th><th scope="col">New term policy</th></tr></thead><tbody>' +
+      r.renewed_policies.map(x => '<tr><td data-label="Old policy"><code>' + x.from + '</code></td><td data-label="Status">' + PF.badgeHtml("RENEWED") + '</td><td data-label="New term policy"><a href="E5-S3.html#detail">' + x.to + "</a> " + PF.badgeHtml("ACTIVE") + "</td></tr>").join("") + "</tbody></table></div>" : "") +
+    (r.lapsed_policies.length ? '<h3 style="margin-top:1rem">Lapsed</h3><ul>' + r.lapsed_policies.map(x => "<li><code>" + x + "</code> " + PF.badgeHtml("LAPSED") + " · grace period expired</li>").join("") + "</ul>" : "") +
+    (r.failed_policies.length ? '<div class="alert alert-warn" role="alert" style="margin-top:1rem"><p><strong>Failed: ' + r.failed + "</strong> — other policies were still processed.</p><ul>" + r.failed_policies.map(x => "<li><code>" + x.policy_number + "</code> — " + x.error + "</li>").join("") + "</ul></div>" : "");
+  $("eod-empty").hidden = true; $("eod-result").hidden = false;
+  PF.announce("End-of-day complete. Renewed " + r.renewed + ", lapsed " + r.lapsed + ", failed " + r.failed);
+});
+$("ex-eod").addEventListener("click", () => { PF.gotoScreen("eod"); $("as_of").value = "2027-01-15"; document.querySelector('[data-testid="run-eod"]').click(); });
+$("ex-fail").addEventListener("click", () => { PF.gotoScreen("eod"); injectFailure = true; $("as_of").value = "2027-02-01"; document.querySelector('[data-testid="run-eod"]').click(); });
+$("ex-bad").addEventListener("click", () => { PF.gotoScreen("eod"); $("as_of").type = "text"; $("as_of").value = "2027-13-01x"; document.querySelector('[data-testid="run-eod"]').click(); $("as_of").type = "date"; });
+document.addEventListener("pf:screen", e => { history.replaceState(null, "", "#" + e.detail); });
+PF.init();
+</script>
+</body>
+</html>

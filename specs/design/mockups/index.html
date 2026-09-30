@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PolicyForge UI mockups · index</title>
+<!-- Index of the /design mockups. Self-contained; no external requests. -->
+<style>
+:root{--bg:#f5f6f8;--surface:#fff;--border:#d5dae1;--text:#1b2330;--muted:#4f5967;--accent:#1d4f8f;
+  --font:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,"Cascadia Mono",Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.45;font-size:15px}
+header{background:#1f2733;color:#fff;padding:1rem 1.5rem}
+header h1{margin:0;font-size:1.3rem}
+header p{margin:.2rem 0 0;color:#d8dee7;font-size:.9rem}
+main{max-width:1200px;margin:0 auto;padding:1.25rem 1.5rem 3rem}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+code{font-family:var(--mono);font-size:.82em;overflow-wrap:anywhere}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1rem 1.1rem;margin-bottom:1rem}
+table{width:100%;border-collapse:collapse;background:var(--surface);font-size:.92rem}
+th,td{text-align:left;vertical-align:top;padding:.6rem .7rem;border-bottom:1px solid var(--border)}
+thead th{background:#f0f2f5;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.wrap{border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.role{font-family:var(--mono);font-size:.74rem;font-weight:700;border:1px solid #aeb6c1;border-radius:4px;padding:.05rem .35rem;white-space:nowrap}
+ul.api{margin:0;padding-left:1rem}
+ul.api li{font-family:var(--mono);font-size:.78rem}
+.muted{color:var(--muted)}
+@media (max-width:767.98px){
+  main{padding:1rem .9rem 3rem}
+  thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  table,tbody,tr,td{display:block;width:100%}
+  tr{border:1px solid var(--border);border-radius:6px;margin-bottom:.7rem;background:var(--surface)}
+  td{border:0;display:grid;grid-template-columns:6.5rem minmax(0,1fr);gap:.5rem}
+  td::before{content:attr(data-label);font-size:.78rem;color:var(--muted);font-weight:600}
+  .wrap{border:0}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>PolicyForge · UI mockups</h1>
+  <p>Horizon Insurance policy issuance and lifecycle · produced by the /design ui-designer</p>
+</header>
+<main>
+  <section class="panel" aria-labelledby="about-h">
+    <h2 id="about-h" style="margin-top:0;font-size:1.05rem">How to use</h2>
+    <p>Each file is self-contained (inline CSS/JS, no network). Use the header <strong>Demo user</strong> switcher (Customer / Underwriter / Admin); the choice persists across pages. The dashed <strong>Mockup</strong> bar at the top of each page switches happy, empty and error states and is not part of the product. The request line in that bar shows the call the real API client would make, with its <code>X-Actor-Id</code>, <code>X-Actor-Role</code> and <code>X-Correlation-ID</code> headers.</p>
+    <p class="muted" style="margin:0">Style: clean, functional internal tool with a neutral palette; statuses are always shown as text badges. Breakpoint: 768 px, where the side nav collapses behind "Open navigation" and tables become stacked cards. Money comes from decimal strings formatted <code>en-IN</code>. Field names follow <code>docs/conventions.md</code>, and any assumed names are listed in the comment at the top of each file.</p>
+  </section>
+  <div class="wrap">
+    <table>
+      <caption class="muted" style="text-align:left;padding:.6rem .7rem">Mockups by story</caption>
+      <thead><tr><th scope="col">Story</th><th scope="col">Screen</th><th scope="col">Role</th><th scope="col">API endpoints</th></tr></thead>
+      <tbody>
+        <tr><td data-label="Story"><a href="E1-S5.html">E1-S5</a></td><td data-label="Screen">App shell: routing, role switcher, responsive layout, "Page not found"</td><td data-label="Role"><span class="role">ALL</span></td>
+          <td data-label="API"><ul class="api"><li>(API client headers)</li><li>GET /api/products</li></ul></td></tr>
+        <tr><td data-label="Story"><a href="E2-S4.html">E2-S4</a></td><td data-label="Screen">Product Catalog Manager: versions, new draft, publish</td><td data-label="Role"><span class="role">ADMIN</span></td>
+          <td data-label="API"><ul class="api"><li>GET /api/products</li><li>GET /api/products/{product}/versions</li><li>POST /api/products/{product}/versions</li><li>PUT /api/products/{product}/versions/{version}</li><li>POST /api/products/{product}/versions/{version}/publish</li></ul></td></tr>
+        <tr><td data-label="Story"><a href="E3-S3.html">E3-S3</a></td><td data-label="Screen">Get a Quote</td><td data-label="Role"><span class="role">CUSTOMER</span></td>
+          <td data-label="API"><ul class="api"><li>POST /api/quotes</li><li>GET /api/quotes/{quote_id}</li></ul></td></tr>
+        <tr><td data-label="Story"><a href="E4-S5.html#apply">E4-S5</a></td><td data-label="Screen"><a href="E4-S5.html#apply">Apply</a> · <a href="E4-S5.html#workbench">Underwriter Workbench</a> · <a href="E4-S5.html#review">Underwriting Review (override)</a></td><td data-label="Role"><span class="role">CUSTOMER</span> <span class="role">UNDERWRITER</span> <span class="role">ADMIN</span></td>
+          <td data-label="API"><ul class="api"><li>POST /api/applications</li><li>POST /api/applications/{application_id}/issue</li><li>GET /api/applications/{application_id}</li><li>GET /api/underwriting/queue</li><li>POST /api/underwriting/applications/{application_id}/decision</li><li>POST /api/underwriting/applications/{application_id}/override</li><li>GET /api/underwriting/applications/{application_id}/audit</li></ul></td></tr>
+        <tr><td data-label="Story"><a href="E5-S3.html">E5-S3</a></td><td data-label="Screen">My Policies · Policy Detail (endorsement history, lifecycle)</td><td data-label="Role"><span class="role">CUSTOMER</span> <span class="role">UNDERWRITER</span> <span class="role">ADMIN</span></td>
+          <td data-label="API"><ul class="api"><li>GET /api/policies</li><li>GET /api/policies/{policy_number}</li></ul></td></tr>
+        <tr><td data-label="Story"><a href="E6-S3.html">E6-S3</a></td><td data-label="Screen">Endorse (with premium-delta preview)</td><td data-label="Role"><span class="role">CUSTOMER</span> <span class="role">ADMIN</span></td>
+          <td data-label="API"><ul class="api"><li>POST /api/policies/{policy_number}/endorsements?preview=true</li><li>POST /api/policies/{policy_number}/endorsements</li></ul></td></tr>
+        <tr><td data-label="Story"><a href="E7-S4.html#renew">E7-S4</a></td><td data-label="Screen"><a href="E7-S4.html#renew">Renew / Pay premium</a> · <a href="E7-S4.html#eod">Run end-of-day</a></td><td data-label="Role"><span class="role">CUSTOMER</span> <span class="role">ADMIN</span></td>
+          <td data-label="API"><ul class="api"><li>GET /api/policies/{policy_number}/renewal</li><li>POST /api/policies/{policy_number}/payments</li><li>POST /api/policies/{policy_number}/renew</li><li>POST /api/admin/end-of-day</li></ul></td></tr>
+        <tr><td data-label="Story"><a href="E8-S3.html">E8-S3</a></td><td data-label="Screen">Cancel with refund preview</td><td data-label="Role"><span class="role">CUSTOMER</span> <span class="role">ADMIN</span></td>
+          <td data-label="API"><ul class="api"><li>GET /api/policies/{policy_number}/cancellation-preview?date=</li><li>POST /api/policies/{policy_number}/cancel</li></ul></td></tr>
+        <tr><td data-label="Story"><a href="E9-S2.html">E9-S2</a></td><td data-label="Screen">Portfolio Dashboard</td><td data-label="Role"><span class="role">ADMIN</span></td>
+          <td data-label="API"><ul class="api"><li>GET /api/admin/portfolio?as_of=</li></ul></td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+</body>
+</html>

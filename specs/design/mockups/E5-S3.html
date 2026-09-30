@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Policies · Policy Detail · PolicyForge mockup E5-S3</title>
+<!--
+  PolicyForge UI mockup E5-S3 · My Policies · Policy Detail
+  Self-contained: all CSS/JS inline, no external requests, no real API calls (fixtures only).
+  Field names follow the "API endpoints" table + request/response notes in docs/conventions.md and the
+  owning feature spec (specs/design/api-contracts.md did not exist when this mockup was written).
+  Every interactive element carries data-api="<METHOD> <path>" and a visible caption.
+  The dashed "Mockup" bar at the top of <main> is NOT part of the product: it toggles happy/empty/error states.
+  Responsive: breakpoint 768px. Below it the side nav collapses behind the "Open navigation" button and
+  tables (.rtable) render as stacked cards.
+  Story E5-S3 (AC-15, AC-05, AC-22, AC-24). Routes: /policies (list) and /policies/:policyNumber (detail).
+  GET /api/policies -> [{policy_number, product, status, sum_insured, premium, effective_date, expiry_date, next_premium_due_date}]
+      (CUSTOMER sees own only; UNDERWRITER/ADMIN see all — switch the demo user to compare)
+  GET /api/policies/{policy_number} -> policy + endorsements[] (type, before, after, premium_delta, created_at; oldest first),
+      transitions[] (from_status, to_status, occurred_at, reason), payments[], refunds[], masked KYC, previous_policy_number
+  Errors: 404 NOT_FOUND (unknown number or another customer's policy).
+  Premiums: MO-2026-000001 15500.00 (MOTOR 500000.00, all factors 1.00); TL-2026-000001 12000.00; HH-2026-000001 2700.00
+  (cancelled 2026-07-21: PRO_RATA 2700.00 x 184/365 - 250.00 = 1111.10); MO-2026-000002 2500.00 (minimum premium).
+  ASSUMED field names: endorsements[].endorsement_id, transitions[] keys from_status/to_status/occurred_at/reason (model column names),
+  payments[] {amount, due_date, rule_version, paid_at}, refunds[] {refund_type, amount, cancellation_date, created_at},
+  kyc.aadhaar_masked / kyc.pan_masked, address and nominees[] on the policy.
+-->
+<style>
+:root{
+  --bg:#f5f6f8;--surface:#ffffff;--surface-2:#f0f2f5;--border:#d5dae1;--border-strong:#aeb6c1;
+  --text:#1b2330;--muted:#4f5967;--accent:#1d4f8f;--accent-hover:#163e71;--accent-soft:#e7eef8;
+  --danger:#9b1c1c;--danger-soft:#fbeaea;--ok:#1d5b34;--ok-soft:#e5f3ea;--warn:#734700;--warn-soft:#fff3dc;
+  --violet:#4a2d86;--violet-soft:#efeaf9;--focus:#1d4f8f;
+  --font:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono","SFMono-Regular",Consolas,monospace;
+  --radius:6px;--nav-w:232px;--header-h:56px;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{font-size:15px;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.45;overflow-x:hidden}
+h1{font-size:1.45rem;margin:0 0 .25rem;font-weight:650;letter-spacing:-.01em}
+h2{font-size:1.1rem;margin:0 0 .75rem;font-weight:650}
+h3{font-size:.98rem;margin:0 0 .5rem;font-weight:650}
+p{margin:0 0 .75rem}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;overflow-wrap:anywhere}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:3px}
+.skip{position:absolute;left:-9999px;top:0;background:var(--surface);padding:.5rem 1rem;z-index:50}
+.skip:focus{left:.5rem;top:.5rem}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ---------- header ---------- */
+.topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
+  min-height:var(--header-h);padding:.5rem 1rem;background:#1f2733;color:#f4f6f9;border-bottom:1px solid #111821}
+.brand{font-weight:700;letter-spacing:.01em;font-size:1.05rem;color:#fff;text-decoration:none;margin-right:auto}
+.brand small{font-weight:400;color:#c4ccd7;margin-left:.4rem;font-size:.8rem}
+.menu-btn{display:none;align-items:center;gap:.4rem;background:transparent;color:#fff;border:1px solid #6b7686;
+  border-radius:var(--radius);padding:.4rem .6rem;font:inherit;cursor:pointer}
+.menu-btn:focus-visible,.role select:focus-visible{outline-color:#9cc2ff}
+.role{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.role label{font-size:.82rem;color:#d8dee7}
+.role select{font:inherit;padding:.35rem .5rem;border-radius:var(--radius);border:1px solid #6b7686;background:#fff;color:var(--text)}
+.hdrs{font-family:var(--mono);font-size:.75rem;color:#d8dee7;background:#2c3645;border-radius:4px;padding:.2rem .45rem}
+
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:var(--nav-w) minmax(0,1fr);min-height:calc(100vh - var(--header-h))}
+.sidenav{background:var(--surface);border-right:1px solid var(--border);padding:1rem .75rem}
+.sidenav ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.15rem}
+.sidenav a{display:block;padding:.55rem .7rem;border-radius:var(--radius);color:var(--text);text-decoration:none}
+.sidenav a:hover{background:var(--surface-2)}
+.sidenav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent);font-weight:650;box-shadow:inset 3px 0 0 var(--accent)}
+.nav-caption{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 .5rem .7rem}
+main{padding:1.25rem 1.5rem 3rem;min-width:0}
+main:focus{outline:none}
+
+/* ---------- mockup bar (not product UI) ---------- */
+.mock-bar{border:1px dashed var(--border-strong);background:#fbfbfc;border-radius:var(--radius);padding:.5rem .7rem;margin-bottom:1.1rem;
+  display:flex;flex-wrap:wrap;gap:.4rem .6rem;align-items:center;font-size:.82rem;color:var(--muted)}
+.mock-tag{font-family:var(--mono);font-weight:700;color:var(--text)}
+.mock-bar .grp{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}
+.mock-bar button{font:inherit;font-size:.78rem;padding:.2rem .5rem;border:1px solid var(--border-strong);background:#fff;border-radius:4px;cursor:pointer;color:var(--text)}
+.mock-bar button[aria-pressed="true"]{background:#1f2733;color:#fff;border-color:#1f2733}
+.req-log{flex-basis:100%;font-family:var(--mono);font-size:.74rem;color:var(--muted);overflow-wrap:anywhere;white-space:pre-wrap;margin:0}
+
+/* ---------- building blocks ---------- */
+.page-head{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:flex-end;justify-content:space-between;margin-bottom:1rem}
+.route{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;margin-bottom:1rem;min-width:0}
+.panel > h2:first-child,.panel > h3:first-child{margin-top:0}
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.75rem}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.8rem .9rem}
+.stat .lbl{font-size:.8rem;color:var(--muted);margin:0}
+.stat .val{font-size:1.4rem;font-weight:650;margin:.1rem 0 0;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:.84rem}
+.row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.stack>*+*{margin-top:.75rem}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:.35rem 1rem;margin:0}
+.kv dt{color:var(--muted);font-size:.86rem}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.api{display:block;font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-top:.25rem;overflow-wrap:anywhere}
+.api::before{content:"\21B3  "}
+.api-inline{font-family:var(--mono);font-size:.72rem;color:var(--muted);overflow-wrap:anywhere}
+
+/* ---------- forms ---------- */
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.9rem 1rem}
+.form-grid .full{grid-column:1/-1}
+.field{display:flex;flex-direction:column;gap:.25rem;min-width:0}
+.field label,.field legend,.lbl-strong{font-weight:600;font-size:.9rem}
+.field .hint{font-size:.78rem;color:var(--muted)}
+.field .fname{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+input[type=text],input[type=date],input[type=number],input[type=password],select,textarea{
+  font:inherit;padding:.5rem .6rem;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff;color:var(--text);width:100%;min-width:0}
+textarea{min-height:5rem;resize:vertical}
+textarea.code{font-family:var(--mono);font-size:.8rem;min-height:14rem}
+input[aria-invalid="true"],select[aria-invalid="true"],textarea[aria-invalid="true"]{border:2px solid var(--danger)}
+.err{color:var(--danger);font-size:.84rem;font-weight:600}
+.err::before{content:"Error: "}
+fieldset{border:1px solid var(--border);border-radius:var(--radius);padding:.6rem .8rem;margin:0;min-width:0}
+fieldset legend{padding:0 .3rem}
+.choice{display:flex;align-items:center;gap:.45rem;padding:.2rem 0}
+.choice input{width:1.05rem;height:1.05rem;margin:0}
+.seg{display:flex;flex-wrap:wrap;gap:.4rem}
+.seg label{display:flex;align-items:center;gap:.4rem;border:1px solid var(--border-strong);border-radius:var(--radius);padding:.45rem .7rem;cursor:pointer;background:#fff}
+.seg input:checked + span{font-weight:650}
+.seg label:has(input:checked){border:2px solid var(--accent);background:var(--accent-soft)}
+
+/* ---------- buttons ---------- */
+.btn{font:inherit;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:.5rem .95rem;border-radius:var(--radius);
+  border:1px solid var(--border-strong);background:#fff;color:var(--text);cursor:pointer;text-decoration:none;min-height:2.4rem}
+.btn:hover{background:var(--surface-2)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn-danger:hover{background:#7e1616}
+.btn-sm{padding:.25rem .6rem;min-height:2rem;font-size:.86rem}
+.btn[disabled],.btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
+.actions{display:flex;flex-wrap:wrap;gap:.6rem;align-items:flex-start;margin-top:1rem}
+.act{display:flex;flex-direction:column}
+
+/* ---------- alerts ---------- */
+.alert{border:1px solid;border-left-width:5px;border-radius:var(--radius);padding:.7rem .9rem;margin-bottom:1rem}
+.alert p:last-child,.alert ul:last-child{margin-bottom:0}
+.alert strong.code{font-family:var(--mono)}
+.alert-error{background:var(--danger-soft);border-color:var(--danger);color:#5f1111}
+.alert-ok{background:var(--ok-soft);border-color:var(--ok);color:#123d22}
+.alert-info{background:var(--accent-soft);border-color:var(--accent);color:#12335e}
+.alert-warn{background:var(--warn-soft);border-color:var(--warn);color:#4d3000}
+.empty{border:1px dashed var(--border-strong);border-radius:var(--radius);padding:1.2rem;text-align:center;color:var(--muted);background:#fbfbfc}
+.loading{display:flex;gap:.5rem;align-items:center;color:var(--muted)}
+.spinner{width:1rem;height:1rem;border:2px solid var(--border-strong);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation:none}}
+
+/* ---------- status badges (text, never colour alone) ---------- */
+.badge{display:inline-flex;align-items:center;gap:.3rem;font-family:var(--mono);font-size:.74rem;font-weight:700;letter-spacing:.03em;
+  padding:.12rem .45rem;border-radius:4px;border:1px solid;white-space:nowrap;background:var(--surface-2);color:var(--text);border-color:var(--border-strong)}
+.badge::before{content:"";width:.45rem;height:.45rem;border-radius:50%;background:currentColor;flex:none}
+.b-ACTIVE,.b-AUTO_BIND,.b-PUBLISHED,.b-PAID,.b-ISSUED{background:var(--ok-soft);color:var(--ok);border-color:#8fc4a1}
+.b-ENDORSED,.b-SUBMITTED,.b-UNDERWRITING{background:var(--accent-soft);color:var(--accent);border-color:#98b5dc}
+.b-LAPSED,.b-MANUAL_REVIEW,.b-UNPAID,.b-IN_GRACE{background:var(--warn-soft);color:var(--warn);border-color:#d9b36a}
+.b-CANCELLED,.b-DECLINE,.b-DECLINED{background:var(--danger-soft);color:var(--danger);border-color:#dc9c9c}
+.b-RENEWED{background:var(--violet-soft);color:var(--violet);border-color:#b7a6dc}
+.b-DRAFT{background:#fff;color:var(--muted);border-style:dashed}
+.b-DRAFT::before{background:transparent;border:1.5px solid currentColor}
+.b-Active{background:#1f2733;color:#fff;border-color:#1f2733}
+.b-CANCELLED::before,.b-DECLINE::before,.b-DECLINED::before{border-radius:1px}
+.b-LAPSED::before,.b-MANUAL_REVIEW::before,.b-UNPAID::before{border-radius:0;transform:rotate(45deg)}
+
+/* ---------- responsive tables → stacked cards ---------- */
+.rtable{width:100%;border-collapse:collapse;background:var(--surface);font-size:.92rem}
+.rtable caption{text-align:left;font-weight:650;padding:0 0 .5rem}
+.rtable th,.rtable td{padding:.55rem .65rem;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+.rtable thead th{background:var(--surface-2);font-size:.8rem;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.04em}
+.rtable tbody tr.selectable{cursor:pointer}
+.rtable tbody tr.selectable:hover,.rtable tbody tr[aria-selected="true"]{background:#f6f9fd}
+.table-wrap{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.table-wrap .rtable tr:last-child td{border-bottom:0}
+
+/* ---------- dialog ---------- */
+dialog{border:1px solid var(--border);border-radius:8px;padding:0;width:min(540px,calc(100vw - 24px));max-height:calc(100vh - 24px);color:var(--text)}
+dialog::backdrop{background:rgba(20,26,36,.55)}
+dialog .dlg-body{padding:1.1rem 1.2rem}
+dialog .dlg-foot{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:flex-end;padding:.8rem 1.2rem;border-top:1px solid var(--border);background:var(--surface-2)}
+
+.timeline{list-style:none;margin:0;padding:0 0 0 .9rem;border-left:2px solid var(--border)}
+.timeline li{position:relative;padding:0 0 .8rem .6rem}
+.timeline li::before{content:"";position:absolute;left:-1.28rem;top:.35rem;width:.6rem;height:.6rem;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+
+/* ---------- breakpoint: 768px ---------- */
+@media (max-width:767.98px){
+  .menu-btn{display:inline-flex}
+  .hdrs{display:none}
+  .brand small{display:none}
+  .layout{display:block}
+  .sidenav{display:none;position:absolute;left:0;right:0;z-index:25;border-right:0;border-bottom:1px solid var(--border);box-shadow:0 8px 20px rgba(0,0,0,.12)}
+  .sidenav.open{display:block}
+  main{padding:1rem .9rem 3rem}
+  .grid-2,.form-grid{grid-template-columns:minmax(0,1fr)}
+  .kv{grid-template-columns:minmax(0,1fr)}
+  .kv dd{margin-bottom:.35rem}
+  .table-wrap{border:0;overflow:visible}
+  .rtable,.rtable tbody,.rtable tr,.rtable td{display:block;width:100%}
+  .rtable thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  .rtable tr{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.65rem;padding:.35rem .2rem}
+  .rtable td{border:0;display:grid;grid-template-columns:minmax(6.5rem,40%) minmax(0,1fr);gap:.5rem;padding:.35rem .6rem}
+  .rtable td::before{content:attr(data-label);font-size:.78rem;color:var(--muted);font-weight:600}
+  .rtable td.cell-actions{grid-template-columns:minmax(0,1fr)}
+  .rtable td.cell-actions::before{display:none}
+  .rtable .num{white-space:normal}
+  .btn{min-height:2.75rem}
+}
+.detail-actions{display:flex;flex-wrap:wrap;gap:.6rem}
+.policy-link{font-family:var(--mono);font-weight:700;background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer;font-size:.92rem}
+.before-after{font-size:.86rem}
+.before-after del{color:var(--muted)}
+.section-gap{margin-top:1.25rem}
+</style>
+</head>
+<body data-story="E5-S3">
+<a class="skip" href="#main">Skip to main content</a>
+<header class="topbar">
+  <button type="button" class="menu-btn" id="nav-toggle" aria-label="Open navigation" aria-controls="sidenav" aria-expanded="false" data-testid="nav-toggle">
+    <span aria-hidden="true">&#9776;</span><span aria-hidden="true">Menu</span>
+  </button>
+  <a class="brand" href="index.html">PolicyForge <small>Horizon Insurance</small></a>
+  <div class="role">
+    <label for="role-switcher">Demo user</label>
+    <select id="role-switcher" data-testid="role-switcher">
+      <option value="CUSTOMER">Customer (cust-001)</option>
+      <option value="UNDERWRITER">Underwriter (uw-001)</option>
+      <option value="ADMIN">Admin (admin-001)</option>
+    </select>
+    <code class="hdrs" id="hdrs" title="Auth-stub headers sent by the API client"></code>
+  </div>
+</header>
+<div class="layout">
+  <nav id="sidenav" class="sidenav" aria-label="Main navigation" data-testid="side-nav">
+    <p class="nav-caption" id="nav-caption">Customer</p>
+    <ul id="nav-list"></ul>
+  </nav>
+  <main id="main" tabindex="-1">
+    <section class="mock-bar" aria-label="Mockup state controls (not part of the product)">
+      <span class="mock-tag">MOCKUP E5-S3</span>
+      <a href="index.html">All mockups</a>
+      <span class="grp" role="group" aria-label="Screen">Screen:
+  <button type="button" data-goto-screen="list" aria-pressed="false">My Policies</button>
+  <button type="button" data-goto-screen="detail" aria-pressed="false">Policy Detail</button>
+</span>
+<span class="grp" role="group" aria-label="List state">List:
+  <button type="button" data-set-state="list:happy" data-default aria-pressed="true">With policies</button>
+  <button type="button" data-set-state="list:empty" aria-pressed="false">Empty</button>
+  <button type="button" data-set-state="list:error" aria-pressed="false">Error (500)</button>
+</span>
+<span class="grp" role="group" aria-label="Detail state">Detail:
+  <button type="button" data-set-state="hist:none" data-default aria-pressed="true">MO-2026-000001 new (no endorsements)</button>
+  <button type="button" data-set-state="hist:some" aria-pressed="false">With endorsement history</button>
+  <button type="button" id="show-404">404 NOT_FOUND</button>
+</span>
+      <p class="req-log" id="req-log" aria-live="polite">No request sent yet.</p>
+    </section>
+    <section id="not-authorised" class="panel" hidden data-testid="not-authorised">
+      <h1>Not authorised</h1>
+      <p>The selected demo user's role cannot open this screen. Switch the demo user in the header.</p>
+      <p class="api">API would answer 403 FORBIDDEN · {"error": {"code": "FORBIDDEN", "message": "Role not allowed on the route", "details": null}}</p>
+    </section>
+    <!-- ===================== MY POLICIES ===================== -->
+    <div class="screen" data-screen="list" data-roles="CUSTOMER UNDERWRITER ADMIN" data-route="/policies">
+      <div class="page-head">
+        <div>
+          <h1 id="list-title">My Policies</h1>
+          <p class="route">Route: /policies</p>
+        </div>
+        <span class="api-inline">GET /api/policies</span>
+      </div>
+      <div data-when="list:happy">
+        <div class="table-wrap">
+          <table class="rtable" data-testid="policies-table">
+            <caption class="sr-only">Policies</caption>
+            <thead><tr><th scope="col">Policy number</th><th scope="col">Product</th><th scope="col">Status</th><th scope="col">Sum insured</th><th scope="col">Premium</th><th scope="col">Term</th><th scope="col">Next premium due</th></tr></thead>
+            <tbody id="policies-body"></tbody>
+          </table>
+        </div>
+        <p class="small muted" style="margin-top:.5rem">Select a policy number to open Policy Detail (<span class="api-inline">GET /api/policies/{policy_number}</span>).</p>
+      </div>
+      <div data-when="list:empty" hidden>
+        <div class="empty" data-testid="policies-empty">
+          <p>You have no policies yet.</p>
+          <a class="btn btn-primary" href="E3-S3.html">Get a Quote</a>
+        </div>
+      </div>
+      <div data-when="list:error" hidden>
+        <div class="alert alert-error" role="alert">
+          <p><strong class="code">500 INTERNAL_ERROR</strong> — your policies could not be loaded. Correlation id <code>5a8e2f1c-9b3d-4c7e-8f06-1d2a4b6c8e90</code>.</p>
+          <button type="button" class="btn btn-sm" data-set-state="list:happy" data-api="GET /api/policies">Retry</button>
+          <span class="api">GET /api/policies</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== POLICY DETAIL ===================== -->
+    <div class="screen" data-screen="detail" data-roles="CUSTOMER UNDERWRITER ADMIN" data-route="/policies">
+      <p><a href="#list" id="back-list">&larr; Back to My Policies</a></p>
+      <div id="detail-404" hidden>
+        <div class="alert alert-error" role="alert" data-testid="policy-not-found">
+          <p><strong class="code">404 NOT_FOUND</strong> — policy <code>MO-2026-999999</code> was not found.</p>
+        </div>
+      </div>
+      <div id="detail">
+        <div class="page-head">
+          <div>
+            <h1><span id="d-number">MO-2026-000001</span> <span id="d-badge"></span></h1>
+            <p class="route">Route: /policies/<span id="d-route">MO-2026-000001</span> · <span class="api-inline">GET /api/policies/{policy_number}</span></p>
+          </div>
+          <div class="detail-actions" id="d-actions"></div>
+        </div>
+        <div class="grid-2">
+          <section class="panel" aria-labelledby="sum-h">
+            <h2 id="sum-h">Policy</h2>
+            <dl class="kv" id="d-summary"></dl>
+          </section>
+          <section class="panel" aria-labelledby="ins-h">
+            <h2 id="ins-h">Insured</h2>
+            <dl class="kv" id="d-insured"></dl>
+          </section>
+        </div>
+        <section class="panel" aria-labelledby="eh-h">
+          <h2 id="eh-h">Endorsement history</h2>
+          <div id="d-endorsements"></div>
+        </section>
+        <div class="grid-2">
+          <section class="panel" aria-labelledby="lc-h">
+            <h2 id="lc-h">Lifecycle</h2>
+            <ol class="timeline" id="d-transitions" data-testid="lifecycle"></ol>
+          </section>
+          <section class="panel" aria-labelledby="pay-h">
+            <h2 id="pay-h">Payments and refunds</h2>
+            <div id="d-payments"></div>
+            <h3 class="section-gap">Refunds</h3>
+            <div id="d-refunds"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<div id="live" class="sr-only" aria-live="polite"></div>
+<script>
+"use strict";
+/* ---------------- shared mockup shell (identical in every mockup) ---------------- */
+const PF = (() => {
+  const ACTORS = { CUSTOMER: "cust-001", UNDERWRITER: "uw-001", ADMIN: "admin-001" };
+  const NAV = {
+    CUSTOMER: [["Get a Quote", "E3-S3.html", "/quote"], ["My Policies", "E5-S3.html", "/policies"]],
+    UNDERWRITER: [["Workbench", "E4-S5.html#workbench", "/underwriter/queue"]],
+    ADMIN: [["Product Catalog", "E2-S4.html", "/admin/catalog"], ["Underwriting Review", "E4-S5.html#review", "/admin/underwriting"], ["Portfolio", "E9-S2.html", "/admin/portfolio"]]
+  };
+  const CAPTION = { CUSTOMER: "Customer", UNDERWRITER: "Underwriter", ADMIN: "Admin" };
+  const KEY = "policyforge.demoRole";
+  const sel = document.getElementById("role-switcher");
+  const nav = document.getElementById("sidenav");
+  const toggle = document.getElementById("nav-toggle");
+  let activeRoute = window.PF_ACTIVE_ROUTE || "";
+  let currentScreen = null;
+  /* Display-only formatting of decimal strings. The UI never does money arithmetic (NFR-01). */
+  const INR = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  function inr(s) { return INR.format(Number(s)); }
+  function signedInr(s) { return (String(s).startsWith("-") ? "−" : "+") + INR.format(Math.abs(Number(s))); }
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "3b1f6f0e-8a4c-4d8e-9a7b-0c2d4e6f8a10";
+  }
+  function role() { return sel.value; }
+  function headers() { return { "X-Actor-Id": ACTORS[role()], "X-Actor-Role": role(), "X-Correlation-ID": uuid() }; }
+  function badge(status, label) {
+    const s = document.createElement("span");
+    s.className = "badge b-" + status; s.textContent = label || status; s.setAttribute("data-testid", "status-badge");
+    return s;
+  }
+  function badgeHtml(status, label) { return '<span class="badge b-' + status + '" data-testid="status-badge">' + (label || status) + "</span>"; }
+  /* Records the request the real API client would send (no network). Never pass raw PII here. */
+  function log(method, path, body, status) {
+    const h = headers();
+    const txt = method + " " + path + (status ? "  → " + status : "") + "\n" +
+      "X-Actor-Id: " + h["X-Actor-Id"] + "  X-Actor-Role: " + h["X-Actor-Role"] + "  X-Correlation-ID: " + h["X-Correlation-ID"] +
+      (body ? "\nbody: " + JSON.stringify(body) : "");
+    document.getElementById("req-log").textContent = txt;
+    return h;
+  }
+  function announce(msg) { const l = document.getElementById("live"); l.textContent = ""; setTimeout(() => { l.textContent = msg; }, 30); }
+  function renderNav(r) {
+    const ul = document.getElementById("nav-list"); ul.innerHTML = "";
+    document.getElementById("nav-caption").textContent = CAPTION[r];
+    NAV[r].forEach(([label, href, route]) => {
+      const li = document.createElement("li"); const a = document.createElement("a");
+      a.href = href; a.textContent = label; a.dataset.route = route; a.setAttribute("data-testid", "nav-" + route.replace(/\W+/g, "-").replace(/^-|-$/g, ""));
+      if (route === activeRoute) a.setAttribute("aria-current", "page");
+      a.addEventListener("click", () => closeNav());
+      li.appendChild(a); ul.appendChild(li);
+    });
+  }
+  function allowed(el, r) { return !el.dataset.roles || el.dataset.roles.split(" ").includes(r); }
+  function applyScreens() {
+    const screens = Array.from(document.querySelectorAll(".screen"));
+    const r = role();
+    let cur = screens.find(s => s.dataset.screen === currentScreen && allowed(s, r)) || screens.find(s => allowed(s, r)) || null;
+    screens.forEach(s => { s.hidden = s !== cur; });
+    document.getElementById("not-authorised").hidden = !!cur || screens.length === 0;
+    currentScreen = cur ? cur.dataset.screen : currentScreen;
+    if (cur && cur.dataset.route) { activeRoute = cur.dataset.route; }
+    document.querySelectorAll("[data-goto-screen]").forEach(b => b.setAttribute("aria-pressed", String(!!cur && b.dataset.gotoScreen === cur.dataset.screen)));
+    renderNav(r);
+    document.dispatchEvent(new CustomEvent("pf:screen", { detail: currentScreen }));
+  }
+  function setRole(r) {
+    sel.value = r;
+    try { localStorage.setItem(KEY, r); } catch (e) { /* storage unavailable in file:// on some browsers */ }
+    document.getElementById("hdrs").textContent = "X-Actor-Id: " + ACTORS[r] + " · X-Actor-Role: " + r;
+    applyScreens();
+    document.dispatchEvent(new CustomEvent("pf:role", { detail: r }));
+  }
+  function gotoScreen(name) {
+    currentScreen = name;
+    const s = document.querySelector('.screen[data-screen="' + name + '"]');
+    if (s && !allowed(s, role())) { setRole(s.dataset.roles.split(" ")[0]); } else { applyScreens(); }
+  }
+  function setState(group, val) {
+    document.querySelectorAll("[data-when]").forEach(el => {
+      const conds = el.dataset.when.split(" ");
+      const mine = conds.filter(c => c.startsWith(group + ":"));
+      if (mine.length) el.hidden = !mine.includes(group + ":" + val);
+    });
+    document.querySelectorAll('[data-set-state^="' + group + ':"]').forEach(b => b.setAttribute("aria-pressed", String(b.dataset.setState === group + ":" + val)));
+    document.dispatchEvent(new CustomEvent("pf:state", { detail: { group, val } }));
+  }
+  function openNav() { nav.classList.add("open"); toggle.setAttribute("aria-expanded", "true"); const f = nav.querySelector("a"); if (f) f.focus(); }
+  function closeNav() { if (!nav.classList.contains("open")) return; nav.classList.remove("open"); toggle.setAttribute("aria-expanded", "false"); }
+  function fieldError(input, msg) {
+    const id = input.id + "-error";
+    let e = document.getElementById(id);
+    if (!msg) { input.removeAttribute("aria-invalid"); if (e) e.remove(); input.setAttribute("aria-describedby", (input.dataset.hintId || "")); return; }
+    if (!e) { e = document.createElement("p"); e.id = id; e.className = "err"; e.setAttribute("data-testid", "error-" + input.id); input.insertAdjacentElement("afterend", e); }
+    e.textContent = msg;
+    input.setAttribute("aria-invalid", "true");
+    input.setAttribute("aria-describedby", ((input.dataset.hintId || "") + " " + id).trim());
+  }
+  function init() {
+    toggle.addEventListener("click", () => nav.classList.contains("open") ? closeNav() : openNav());
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && nav.classList.contains("open")) { closeNav(); toggle.focus(); } });
+    sel.addEventListener("change", () => { setRole(sel.value); announce("Demo user switched to " + sel.options[sel.selectedIndex].text); });
+    document.querySelectorAll("[data-set-state]").forEach(b => b.addEventListener("click", () => { const [g, v] = b.dataset.setState.split(":"); setState(g, v); }));
+    document.querySelectorAll("[data-goto-screen]").forEach(b => b.addEventListener("click", () => gotoScreen(b.dataset.gotoScreen)));
+    window.addEventListener("hashchange", () => { const h = location.hash.replace("#", ""); if (h && document.querySelector('.screen[data-screen="' + h + '"]')) gotoScreen(h); });
+    const hash = location.hash.replace("#", "");
+    if (hash && document.querySelector('.screen[data-screen="' + hash + '"]')) currentScreen = hash;
+    let stored = null; try { stored = localStorage.getItem(KEY); } catch (e) { stored = null; }
+    let r = ACTORS[stored] ? stored : (window.PF_DEFAULT_ROLE || "CUSTOMER");
+    const want = currentScreen && document.querySelector('.screen[data-screen="' + currentScreen + '"]');
+    if (want && !allowed(want, r)) r = want.dataset.roles.split(" ")[0];
+    else if (!want && window.PF_DEFAULT_ROLE && !stored) r = window.PF_DEFAULT_ROLE;
+    setRole(r);
+    document.querySelectorAll("[data-set-state][data-default]").forEach(b => { const [g, v] = b.dataset.setState.split(":"); setState(g, v); });
+  }
+  return { inr, signedInr, uuid, role, headers, log, badge, badgeHtml, announce, setState, setRole, gotoScreen, fieldError, init, ACTORS };
+})();
+</script>
+<script>
+"use strict";
+/* ---------------- page script: E5-S3 ---------------- */
+window.PF_ACTIVE_ROUTE = "/policies";
+const POLICIES = [
+  { customer_id: "cust-001", policy_number: "MO-2026-000001", product: "MOTOR", status: "ACTIVE", sum_insured: "500000.00", premium: "15500.00",
+    effective_date: "2026-03-01", expiry_date: "2027-02-28", next_premium_due_date: "2027-03-01", rule_version: 1, currency: "INR", previous_policy_number: null,
+    kyc: { full_name: "Test Customer 01", aadhaar_masked: "XXXX-XXXX-0001", pan_masked: "XXXXX0001X" }, address: "1 Sample Street, Testville", nominees: [],
+    endorsements: [], transitions: [{ from_status: null, to_status: "ACTIVE", occurred_at: "2026-03-01T10:05:00Z", reason: "ISSUED" }],
+    payments: [{ amount: "15500.00", due_date: "2026-03-01", rule_version: 1, paid_at: "2026-03-01T10:05:00Z" }], refunds: [] },
+  { customer_id: "cust-001", policy_number: "TL-2026-000001", product: "TERM_LIFE", status: "ACTIVE", sum_insured: "5000000.00", premium: "12000.00",
+    effective_date: "2026-01-01", expiry_date: "2026-12-31", next_premium_due_date: "2027-01-01", rule_version: 1, currency: "INR", previous_policy_number: null,
+    kyc: { full_name: "Test Customer 01", aadhaar_masked: "XXXX-XXXX-0001", pan_masked: "XXXXX0001X" }, address: "1 Sample Street, Testville",
+    nominees: [{ nominee_name: "Test Nominee 01", relationship: "SPOUSE", share_percent: "100" }],
+    endorsements: [], transitions: [{ from_status: null, to_status: "ACTIVE", occurred_at: "2026-01-01T09:12:00Z", reason: "ISSUED" }],
+    payments: [{ amount: "12000.00", due_date: "2026-01-01", rule_version: 1, paid_at: "2026-01-01T09:12:00Z" }], refunds: [] },
+  { customer_id: "cust-001", policy_number: "HH-2026-000001", product: "HOUSEHOLD", status: "CANCELLED", sum_insured: "3000000.00", premium: "2700.00",
+    effective_date: "2026-01-21", expiry_date: "2027-01-20", next_premium_due_date: null, rule_version: 1, currency: "INR", previous_policy_number: null,
+    kyc: { full_name: "Test Customer 01", aadhaar_masked: "XXXX-XXXX-0001", pan_masked: "XXXXX0001X" }, address: "1 Sample Street, Testville", nominees: [],
+    endorsements: [], transitions: [{ from_status: null, to_status: "ACTIVE", occurred_at: "2026-01-21T11:00:00Z", reason: "ISSUED" }, { from_status: "ACTIVE", to_status: "CANCELLED", occurred_at: "2026-07-21T14:30:00Z", reason: "CUSTOMER_REQUEST" }],
+    payments: [{ amount: "2700.00", due_date: "2026-01-21", rule_version: 1, paid_at: "2026-01-21T11:00:00Z" }],
+    refunds: [{ refund_type: "PRO_RATA", amount: "1111.10", cancellation_date: "2026-07-21", created_at: "2026-07-21T14:30:00Z" }] },
+  { customer_id: "cust-002", policy_number: "MO-2026-000002", product: "MOTOR", status: "ENDORSED", sum_insured: "100000.00", premium: "2500.00",
+    effective_date: "2026-05-11", expiry_date: "2027-05-10", next_premium_due_date: "2027-05-11", rule_version: 1, currency: "INR", previous_policy_number: null,
+    kyc: { full_name: "Test Customer 02", aadhaar_masked: "XXXX-XXXX-0002", pan_masked: "XXXXX0002X" }, address: "7 Example Road, Demotown", nominees: [],
+    endorsements: [{ endorsement_id: "e2b7c4d1-5f38-4a9e-b1c6-0d7f2e8a3b54", type: "CHANGE_ADDRESS", before: { address: "3 Placeholder Lane, Demotown" }, after: { address: "7 Example Road, Demotown" }, premium_delta: "0.00", created_at: "2026-08-14T12:00:00Z" }],
+    transitions: [{ from_status: null, to_status: "ACTIVE", occurred_at: "2026-05-11T10:00:00Z", reason: "ISSUED" }, { from_status: "ACTIVE", to_status: "ENDORSED", occurred_at: "2026-08-14T12:00:00Z", reason: "ENDORSEMENT:CHANGE_ADDRESS" }],
+    payments: [{ amount: "2500.00", due_date: "2026-05-11", rule_version: 1, paid_at: "2026-05-11T10:00:00Z" }], refunds: [] }
+];
+/* "With endorsement history" variant of MO-2026-000001 */
+const MO_HISTORY = {
+  status: "ENDORSED", address: "2 Sample Road, Testville", nominees: [{ nominee_name: "Test Nominee 01", relationship: "SPOUSE", share_percent: "100" }],
+  endorsements: [
+    { endorsement_id: "0c6f8e2a-4d17-4b3a-9e5c-7a1b2d3e4f60", type: "CHANGE_ADDRESS", before: { address: "1 Sample Street, Testville" }, after: { address: "2 Sample Road, Testville" }, premium_delta: "0.00", created_at: "2026-06-10T09:30:00Z" },
+    { endorsement_id: "9d2e4f6a-8b1c-4e3d-a5f7-2c4e6a8b0d13", type: "ADD_NOMINEE", before: { nominees: [] }, after: { nominee_name: "Test Nominee 01", relationship: "SPOUSE", share_percent: "100" }, premium_delta: "0.00", created_at: "2026-07-02T16:45:00Z" }],
+  transitions: [
+    { from_status: null, to_status: "ACTIVE", occurred_at: "2026-03-01T10:05:00Z", reason: "ISSUED" },
+    { from_status: "ACTIVE", to_status: "ENDORSED", occurred_at: "2026-06-10T09:30:00Z", reason: "ENDORSEMENT:CHANGE_ADDRESS" },
+    { from_status: "ENDORSED", to_status: "ENDORSED", occurred_at: "2026-07-02T16:45:00Z", reason: "ENDORSEMENT:ADD_NOMINEE" }]
+};
+const NAMES = { TERM_LIFE: "Term Life", MOTOR: "Motor", HOUSEHOLD: "Household" };
+const $ = id => document.getElementById(id);
+let current = "MO-2026-000001";
+let withHistory = false;
+function visible() { return PF.role() === "CUSTOMER" ? POLICIES.filter(p => p.customer_id === "cust-001") : POLICIES; }
+function renderList() {
+  $("list-title").textContent = PF.role() === "CUSTOMER" ? "My Policies" : "All policies";
+  const tb = $("policies-body"); tb.innerHTML = "";
+  visible().forEach(p => {
+    const tr = document.createElement("tr"); tr.className = "selectable"; tr.setAttribute("data-testid", "policy-row-" + p.policy_number);
+    tr.innerHTML =
+      '<td data-label="Policy number"><button type="button" class="policy-link" data-api="GET /api/policies/' + p.policy_number + '" aria-label="Open policy ' + p.policy_number + '">' + p.policy_number + "</button></td>" +
+      '<td data-label="Product">' + NAMES[p.product] + "</td>" +
+      '<td data-label="Status">' + PF.badgeHtml(p.status) + "</td>" +
+      '<td data-label="Sum insured" class="num">' + PF.inr(p.sum_insured) + "</td>" +
+      '<td data-label="Premium" class="num">' + PF.inr(p.premium) + "</td>" +
+      '<td data-label="Term" class="num">' + p.effective_date + " – " + p.expiry_date + "</td>" +
+      '<td data-label="Next premium due" class="num">' + (p.next_premium_due_date || '<span class="muted">— (not renewable)</span>') + "</td>";
+    const open = () => { current = p.policy_number; showDetail(); };
+    tr.addEventListener("click", e => { if (!e.target.closest("button")) open(); });
+    tr.querySelector("button").addEventListener("click", open);
+    tb.appendChild(tr);
+  });
+}
+function data() {
+  const p = POLICIES.find(x => x.policy_number === current);
+  return p.policy_number === "MO-2026-000001" && withHistory ? Object.assign({}, p, MO_HISTORY) : p;
+}
+function beforeAfter(o) {
+  if (o.address !== undefined) return o.address;
+  if (o.nominee_name) return o.nominee_name + " (" + o.relationship + ", " + o.share_percent + "%)";
+  if (o.nominees) return o.nominees.length ? o.nominees.length + " nominee(s)" : "No nominees";
+  if (o.sum_insured) return "Sum insured " + PF.inr(o.sum_insured);
+  return JSON.stringify(o);
+}
+function ts(s) { return s.replace("T", " ").slice(0, 16); }
+function showDetail() {
+  $("detail-404").hidden = true; $("detail").hidden = false;
+  const p = data();
+  PF.log("GET", "/api/policies/" + p.policy_number, null, "200");
+  $("d-number").textContent = p.policy_number; $("d-route").textContent = p.policy_number;
+  $("d-badge").innerHTML = PF.badgeHtml(p.status);
+  $("d-summary").innerHTML =
+    "<dt>Product</dt><dd>" + NAMES[p.product] + " (<code>" + p.product + "</code>)</dd>" +
+    "<dt>Rule version</dt><dd>v" + p.rule_version + "</dd>" +
+    "<dt>Sum insured</dt><dd class='num'>" + PF.inr(p.sum_insured) + "</dd>" +
+    "<dt>Premium</dt><dd class='num' data-testid='detail-premium'>" + PF.inr(p.premium) + "</dd>" +
+    "<dt>Term</dt><dd class='num'>" + p.effective_date + " – " + p.expiry_date + "</dd>" +
+    "<dt>Next premium due</dt><dd class='num'>" + (p.next_premium_due_date || "—") + "</dd>" +
+    (p.previous_policy_number ? "<dt>Previous policy</dt><dd><code>" + p.previous_policy_number + "</code></dd>" : "");
+  $("d-insured").innerHTML =
+    "<dt>Name</dt><dd>" + p.kyc.full_name + "</dd>" +
+    "<dt>Aadhaar</dt><dd class='mono' data-testid='detail-aadhaar'>" + p.kyc.aadhaar_masked + "</dd>" +
+    "<dt>PAN</dt><dd class='mono'>" + p.kyc.pan_masked + "</dd>" +
+    "<dt>Address</dt><dd>" + p.address + "</dd>" +
+    "<dt>Nominees</dt><dd>" + (p.nominees.length ? p.nominees.map(n => n.nominee_name + " · " + n.relationship + " · " + n.share_percent + "%").join("<br>") : "None") + "</dd>";
+  const live = p.status === "ACTIVE" || p.status === "ENDORSED";
+  const r = PF.role();
+  const acts = [];
+  if (live && (r === "CUSTOMER" || r === "ADMIN")) acts.push(['Endorse', 'E6-S3.html', "POST /api/policies/{policy_number}/endorsements", "endorse"]);
+  if (live && r === "CUSTOMER") acts.push(['Renew', 'E7-S4.html#renew', "GET /api/policies/{policy_number}/renewal", "renew"]);
+  if (live && (r === "CUSTOMER" || r === "ADMIN")) acts.push(['Cancel policy', 'E8-S3.html', "GET /api/policies/{policy_number}/cancellation-preview", "cancel"]);
+  $("d-actions").innerHTML = acts.map(a => '<div class="act"><a class="btn" href="' + a[1] + '" data-testid="action-' + a[3] + '" data-api="' + a[2] + '">' + a[0] + '</a><span class="api">' + a[2] + "</span></div>").join("") ||
+    '<span class="small muted">No lifecycle actions — ' + p.status + " is a terminal status.</span>";
+  $("d-endorsements").innerHTML = p.endorsements.length
+    ? '<div class="table-wrap"><table class="rtable" data-testid="endorsement-history"><caption class="sr-only">Endorsements, oldest first</caption><thead><tr><th scope="col">Date</th><th scope="col">Type</th><th scope="col">Before</th><th scope="col">After</th><th scope="col">Premium delta</th></tr></thead><tbody>' +
+      p.endorsements.map(e => '<tr><td data-label="Date" class="num">' + ts(e.created_at) + '</td><td data-label="Type"><code>' + e.type + '</code></td><td data-label="Before" class="before-after">' + beforeAfter(e.before) + '</td><td data-label="After" class="before-after">' + beforeAfter(e.after) + '</td><td data-label="Premium delta" class="num">' + PF.signedInr(e.premium_delta) + "</td></tr>").join("") + "</tbody></table></div>"
+    : '<div class="empty" data-testid="endorsements-empty">No endorsements on this policy yet.</div>';
+  $("d-transitions").innerHTML = p.transitions.map(t => "<li>" + (t.from_status ? PF.badgeHtml(t.from_status) + " &rarr; " : "Issued &rarr; ") + PF.badgeHtml(t.to_status) +
+    '<br><span class="small muted">' + ts(t.occurred_at) + " · reason <code>" + t.reason + "</code></span></li>").join("");
+  $("d-payments").innerHTML = '<div class="table-wrap"><table class="rtable"><caption class="sr-only">Premium payments</caption><thead><tr><th scope="col">Due date</th><th scope="col">Amount</th><th scope="col">Rule</th><th scope="col">Status</th></tr></thead><tbody>' +
+    p.payments.map(x => '<tr><td data-label="Due date" class="num">' + x.due_date + '</td><td data-label="Amount" class="num">' + PF.inr(x.amount) + '</td><td data-label="Rule">v' + x.rule_version + '</td><td data-label="Status">' + PF.badgeHtml("PAID") + "</td></tr>").join("") + "</tbody></table></div>";
+  $("d-refunds").innerHTML = p.refunds.length
+    ? '<div class="table-wrap"><table class="rtable" data-testid="refunds"><caption class="sr-only">Refunds</caption><thead><tr><th scope="col">Cancellation date</th><th scope="col">Type</th><th scope="col">Amount</th></tr></thead><tbody>' +
+      p.refunds.map(x => '<tr><td data-label="Cancellation date" class="num">' + x.cancellation_date + '</td><td data-label="Type"><code>' + x.refund_type + '</code></td><td data-label="Amount" class="num">' + PF.inr(x.amount) + "</td></tr>").join("") + "</tbody></table></div>"
+    : '<p class="small muted">No refunds.</p>';
+  PF.gotoScreen("detail");
+}
+$("back-list").addEventListener("click", e => { e.preventDefault(); PF.gotoScreen("list"); });
+$("show-404").addEventListener("click", () => {
+  PF.gotoScreen("detail"); $("detail").hidden = true; $("detail-404").hidden = false;
+  PF.log("GET", "/api/policies/MO-2026-999999", null, "404 NOT_FOUND");
+});
+document.addEventListener("pf:state", e => { if (e.detail.group === "hist") { withHistory = e.detail.val === "some"; if (e.detail.val === "some") { current = "MO-2026-000001"; showDetail(); } else if (!document.querySelector('.screen[data-screen="detail"]').hidden) showDetail(); } });
+document.addEventListener("pf:role", () => { renderList(); if (!document.querySelector('.screen[data-screen="detail"]').hidden) showDetail(); });
+document.addEventListener("pf:screen", e => { history.replaceState(null, "", "#" + e.detail); });
+PF.init();
+renderList();
+if (location.hash === "#detail") showDetail();
+window.addEventListener("hashchange", () => { if (location.hash === "#detail") showDetail(); else if (location.hash === "#list") PF.gotoScreen("list"); });
+</script>
+</body>
+</html>

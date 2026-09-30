@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apply · Underwriter Workbench · Underwriting Review · PolicyForge mockup E4-S5</title>
+<!--
+  PolicyForge UI mockup E4-S5 · Apply · Underwriter Workbench · Underwriting Review
+  Self-contained: all CSS/JS inline, no external requests, no real API calls (fixtures only).
+  Field names follow the "API endpoints" table + request/response notes in docs/conventions.md and the
+  owning feature spec (specs/design/api-contracts.md did not exist when this mockup was written).
+  Every interactive element carries data-api="<METHOD> <path>" and a visible caption.
+  The dashed "Mockup" bar at the top of <main> is NOT part of the product: it toggles happy/empty/error states.
+  Responsive: breakpoint 768px. Below it the side nav collapses behind the "Open navigation" button and
+  tables (.rtable) render as stacked cards.
+  Story E4-S5 (AC-03, AC-04, AC-09, AC-14, AC-24, NFR-03). Three screens in one mockup (switch with the Mockup bar or #hash):
+    #apply      /apply/:quoteId        CUSTOMER     POST /api/applications {quote_id, kyc:{full_name, date_of_birth, aadhaar, pan, address}, health_declaration?}
+                                                   -> 201 application_id, status, decision, reason_codes (+ descriptions), rule_version, masked KYC (aadhaar_masked, pan_masked)
+                                                   then POST /api/applications/{application_id}/issue (AUTO_BIND only) -> 201 policy_number
+    #workbench  /underwriter/queue     UNDERWRITER  GET /api/underwriting/queue (MANUAL_REVIEW), GET /api/applications/{application_id},
+                                                   GET /api/underwriting/applications/{application_id}/audit,
+                                                   POST /api/underwriting/applications/{application_id}/decision {decision: APPROVE|DECLINE, reason_codes, comment}
+    #review     /admin/underwriting    ADMIN        GET /api/underwriting/queue?status=MANUAL_REVIEW|DECLINED,
+                                                   POST /api/underwriting/applications/{application_id}/override {reason_code, comment (>= 10 chars)}
+  PII: raw Aadhaar/PAN are only ever typed into password-type inputs; every rendered value is masked (XXXX-XXXX-0001 / XXXXX0001X).
+  The request log never shows kyc.aadhaar / kyc.pan (replaced by "***").
+  ASSUMED field names (not yet spelled out in docs/conventions.md; confirm in api-contracts.md):
+    - reason code descriptions returned as reason_descriptions {code: text}; MO-UW-002 v1 text "Vehicle older than 10 years",
+      MO-UW-003 v1 text "Sum insured above 2500000.00" (only MO-UW-001 and -90x wording is fixed in the specs).
+    - queue item fields: application_id, product, status, reason_codes, rule_version, submitted_at, customer_id, decision_history[].
+    - audit rows: action, actor_id, actor_role, created_at, detail.comment.
+    - status_history[]: {status, at}. The "Issue policy" button on the Apply result (POST /api/applications/{id}/issue) is included so
+      the customer flow reaches My Policies; E4-S5 itself does not name it.
+-->
+<style>
+:root{
+  --bg:#f5f6f8;--surface:#ffffff;--surface-2:#f0f2f5;--border:#d5dae1;--border-strong:#aeb6c1;
+  --text:#1b2330;--muted:#4f5967;--accent:#1d4f8f;--accent-hover:#163e71;--accent-soft:#e7eef8;
+  --danger:#9b1c1c;--danger-soft:#fbeaea;--ok:#1d5b34;--ok-soft:#e5f3ea;--warn:#734700;--warn-soft:#fff3dc;
+  --violet:#4a2d86;--violet-soft:#efeaf9;--focus:#1d4f8f;
+  --font:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono","SFMono-Regular",Consolas,monospace;
+  --radius:6px;--nav-w:232px;--header-h:56px;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{font-size:15px;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.45;overflow-x:hidden}
+h1{font-size:1.45rem;margin:0 0 .25rem;font-weight:650;letter-spacing:-.01em}
+h2{font-size:1.1rem;margin:0 0 .75rem;font-weight:650}
+h3{font-size:.98rem;margin:0 0 .5rem;font-weight:650}
+p{margin:0 0 .75rem}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;overflow-wrap:anywhere}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:3px}
+.skip{position:absolute;left:-9999px;top:0;background:var(--surface);padding:.5rem 1rem;z-index:50}
+.skip:focus{left:.5rem;top:.5rem}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ---------- header ---------- */
+.topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
+  min-height:var(--header-h);padding:.5rem 1rem;background:#1f2733;color:#f4f6f9;border-bottom:1px solid #111821}
+.brand{font-weight:700;letter-spacing:.01em;font-size:1.05rem;color:#fff;text-decoration:none;margin-right:auto}
+.brand small{font-weight:400;color:#c4ccd7;margin-left:.4rem;font-size:.8rem}
+.menu-btn{display:none;align-items:center;gap:.4rem;background:transparent;color:#fff;border:1px solid #6b7686;
+  border-radius:var(--radius);padding:.4rem .6rem;font:inherit;cursor:pointer}
+.menu-btn:focus-visible,.role select:focus-visible{outline-color:#9cc2ff}
+.role{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.role label{font-size:.82rem;color:#d8dee7}
+.role select{font:inherit;padding:.35rem .5rem;border-radius:var(--radius);border:1px solid #6b7686;background:#fff;color:var(--text)}
+.hdrs{font-family:var(--mono);font-size:.75rem;color:#d8dee7;background:#2c3645;border-radius:4px;padding:.2rem .45rem}
+
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:var(--nav-w) minmax(0,1fr);min-height:calc(100vh - var(--header-h))}
+.sidenav{background:var(--surface);border-right:1px solid var(--border);padding:1rem .75rem}
+.sidenav ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.15rem}
+.sidenav a{display:block;padding:.55rem .7rem;border-radius:var(--radius);color:var(--text);text-decoration:none}
+.sidenav a:hover{background:var(--surface-2)}
+.sidenav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent);font-weight:650;box-shadow:inset 3px 0 0 var(--accent)}
+.nav-caption{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 .5rem .7rem}
+main{padding:1.25rem 1.5rem 3rem;min-width:0}
+main:focus{outline:none}
+
+/* ---------- mockup bar (not product UI) ---------- */
+.mock-bar{border:1px dashed var(--border-strong);background:#fbfbfc;border-radius:var(--radius);padding:.5rem .7rem;margin-bottom:1.1rem;
+  display:flex;flex-wrap:wrap;gap:.4rem .6rem;align-items:center;font-size:.82rem;color:var(--muted)}
+.mock-tag{font-family:var(--mono);font-weight:700;color:var(--text)}
+.mock-bar .grp{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}
+.mock-bar button{font:inherit;font-size:.78rem;padding:.2rem .5rem;border:1px solid var(--border-strong);background:#fff;border-radius:4px;cursor:pointer;color:var(--text)}
+.mock-bar button[aria-pressed="true"]{background:#1f2733;color:#fff;border-color:#1f2733}
+.req-log{flex-basis:100%;font-family:var(--mono);font-size:.74rem;color:var(--muted);overflow-wrap:anywhere;white-space:pre-wrap;margin:0}
+
+/* ---------- building blocks ---------- */
+.page-head{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:flex-end;justify-content:space-between;margin-bottom:1rem}
+.route{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;margin-bottom:1rem;min-width:0}
+.panel > h2:first-child,.panel > h3:first-child{margin-top:0}
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.75rem}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.8rem .9rem}
+.stat .lbl{font-size:.8rem;color:var(--muted);margin:0}
+.stat .val{font-size:1.4rem;font-weight:650;margin:.1rem 0 0;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:.84rem}
+.row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.stack>*+*{margin-top:.75rem}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:.35rem 1rem;margin:0}
+.kv dt{color:var(--muted);font-size:.86rem}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.api{display:block;font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-top:.25rem;overflow-wrap:anywhere}
+.api::before{content:"\21B3  "}
+.api-inline{font-family:var(--mono);font-size:.72rem;color:var(--muted);overflow-wrap:anywhere}
+
+/* ---------- forms ---------- */
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.9rem 1rem}
+.form-grid .full{grid-column:1/-1}
+.field{display:flex;flex-direction:column;gap:.25rem;min-width:0}
+.field label,.field legend,.lbl-strong{font-weight:600;font-size:.9rem}
+.field .hint{font-size:.78rem;color:var(--muted)}
+.field .fname{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+input[type=text],input[type=date],input[type=number],input[type=password],select,textarea{
+  font:inherit;padding:.5rem .6rem;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff;color:var(--text);width:100%;min-width:0}
+textarea{min-height:5rem;resize:vertical}
+textarea.code{font-family:var(--mono);font-size:.8rem;min-height:14rem}
+input[aria-invalid="true"],select[aria-invalid="true"],textarea[aria-invalid="true"]{border:2px solid var(--danger)}
+.err{color:var(--danger);font-size:.84rem;font-weight:600}
+.err::before{content:"Error: "}
+fieldset{border:1px solid var(--border);border-radius:var(--radius);padding:.6rem .8rem;margin:0;min-width:0}
+fieldset legend{padding:0 .3rem}
+.choice{display:flex;align-items:center;gap:.45rem;padding:.2rem 0}
+.choice input{width:1.05rem;height:1.05rem;margin:0}
+.seg{display:flex;flex-wrap:wrap;gap:.4rem}
+.seg label{display:flex;align-items:center;gap:.4rem;border:1px solid var(--border-strong);border-radius:var(--radius);padding:.45rem .7rem;cursor:pointer;background:#fff}
+.seg input:checked + span{font-weight:650}
+.seg label:has(input:checked){border:2px solid var(--accent);background:var(--accent-soft)}
+
+/* ---------- buttons ---------- */
+.btn{font:inherit;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:.5rem .95rem;border-radius:var(--radius);
+  border:1px solid var(--border-strong);background:#fff;color:var(--text);cursor:pointer;text-decoration:none;min-height:2.4rem}
+.btn:hover{background:var(--surface-2)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn-danger:hover{background:#7e1616}
+.btn-sm{padding:.25rem .6rem;min-height:2rem;font-size:.86rem}
+.btn[disabled],.btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
+.actions{display:flex;flex-wrap:wrap;gap:.6rem;align-items:flex-start;margin-top:1rem}
+.act{display:flex;flex-direction:column}
+
+/* ---------- alerts ---------- */
+.alert{border:1px solid;border-left-width:5px;border-radius:var(--radius);padding:.7rem .9rem;margin-bottom:1rem}
+.alert p:last-child,.alert ul:last-child{margin-bottom:0}
+.alert strong.code{font-family:var(--mono)}
+.alert-error{background:var(--danger-soft);border-color:var(--danger);color:#5f1111}
+.alert-ok{background:var(--ok-soft);border-color:var(--ok);color:#123d22}
+.alert-info{background:var(--accent-soft);border-color:var(--accent);color:#12335e}
+.alert-warn{background:var(--warn-soft);border-color:var(--warn);color:#4d3000}
+.empty{border:1px dashed var(--border-strong);border-radius:var(--radius);padding:1.2rem;text-align:center;color:var(--muted);background:#fbfbfc}
+.loading{display:flex;gap:.5rem;align-items:center;color:var(--muted)}
+.spinner{width:1rem;height:1rem;border:2px solid var(--border-strong);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation:none}}
+
+/* ---------- status badges (text, never colour alone) ---------- */
+.badge{display:inline-flex;align-items:center;gap:.3rem;font-family:var(--mono);font-size:.74rem;font-weight:700;letter-spacing:.03em;
+  padding:.12rem .45rem;border-radius:4px;border:1px solid;white-space:nowrap;background:var(--surface-2);color:var(--text);border-color:var(--border-strong)}
+.badge::before{content:"";width:.45rem;height:.45rem;border-radius:50%;background:currentColor;flex:none}
+.b-ACTIVE,.b-AUTO_BIND,.b-PUBLISHED,.b-PAID,.b-ISSUED{background:var(--ok-soft);color:var(--ok);border-color:#8fc4a1}
+.b-ENDORSED,.b-SUBMITTED,.b-UNDERWRITING{background:var(--accent-soft);color:var(--accent);border-color:#98b5dc}
+.b-LAPSED,.b-MANUAL_REVIEW,.b-UNPAID,.b-IN_GRACE{background:var(--warn-soft);color:var(--warn);border-color:#d9b36a}
+.b-CANCELLED,.b-DECLINE,.b-DECLINED{background:var(--danger-soft);color:var(--danger);border-color:#dc9c9c}
+.b-RENEWED{background:var(--violet-soft);color:var(--violet);border-color:#b7a6dc}
+.b-DRAFT{background:#fff;color:var(--muted);border-style:dashed}
+.b-DRAFT::before{background:transparent;border:1.5px solid currentColor}
+.b-Active{background:#1f2733;color:#fff;border-color:#1f2733}
+.b-CANCELLED::before,.b-DECLINE::before,.b-DECLINED::before{border-radius:1px}
+.b-LAPSED::before,.b-MANUAL_REVIEW::before,.b-UNPAID::before{border-radius:0;transform:rotate(45deg)}
+
+/* ---------- responsive tables → stacked cards ---------- */
+.rtable{width:100%;border-collapse:collapse;background:var(--surface);font-size:.92rem}
+.rtable caption{text-align:left;font-weight:650;padding:0 0 .5rem}
+.rtable th,.rtable td{padding:.55rem .65rem;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+.rtable thead th{background:var(--surface-2);font-size:.8rem;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.04em}
+.rtable tbody tr.selectable{cursor:pointer}
+.rtable tbody tr.selectable:hover,.rtable tbody tr[aria-selected="true"]{background:#f6f9fd}
+.table-wrap{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.table-wrap .rtable tr:last-child td{border-bottom:0}
+
+/* ---------- dialog ---------- */
+dialog{border:1px solid var(--border);border-radius:8px;padding:0;width:min(540px,calc(100vw - 24px));max-height:calc(100vh - 24px);color:var(--text)}
+dialog::backdrop{background:rgba(20,26,36,.55)}
+dialog .dlg-body{padding:1.1rem 1.2rem}
+dialog .dlg-foot{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:flex-end;padding:.8rem 1.2rem;border-top:1px solid var(--border);background:var(--surface-2)}
+
+.timeline{list-style:none;margin:0;padding:0 0 0 .9rem;border-left:2px solid var(--border)}
+.timeline li{position:relative;padding:0 0 .8rem .6rem}
+.timeline li::before{content:"";position:absolute;left:-1.28rem;top:.35rem;width:.6rem;height:.6rem;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+
+/* ---------- breakpoint: 768px ---------- */
+@media (max-width:767.98px){
+  .menu-btn{display:inline-flex}
+  .hdrs{display:none}
+  .brand small{display:none}
+  .layout{display:block}
+  .sidenav{display:none;position:absolute;left:0;right:0;z-index:25;border-right:0;border-bottom:1px solid var(--border);box-shadow:0 8px 20px rgba(0,0,0,.12)}
+  .sidenav.open{display:block}
+  main{padding:1rem .9rem 3rem}
+  .grid-2,.form-grid{grid-template-columns:minmax(0,1fr)}
+  .kv{grid-template-columns:minmax(0,1fr)}
+  .kv dd{margin-bottom:.35rem}
+  .table-wrap{border:0;overflow:visible}
+  .rtable,.rtable tbody,.rtable tr,.rtable td{display:block;width:100%}
+  .rtable thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  .rtable tr{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.65rem;padding:.35rem .2rem}
+  .rtable td{border:0;display:grid;grid-template-columns:minmax(6.5rem,40%) minmax(0,1fr);gap:.5rem;padding:.35rem .6rem}
+  .rtable td::before{content:attr(data-label);font-size:.78rem;color:var(--muted);font-weight:600}
+  .rtable td.cell-actions{grid-template-columns:minmax(0,1fr)}
+  .rtable td.cell-actions::before{display:none}
+  .rtable .num{white-space:normal}
+  .btn{min-height:2.75rem}
+}
+.wb{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:1rem;align-items:start}
+.reason-list{list-style:none;margin:0;padding:0}
+.reason-list li{padding:.35rem 0;border-bottom:1px solid var(--border)}
+.reason-list li:last-child{border-bottom:0}
+.reason-list code{font-weight:700}
+.counter{font-size:.78rem;color:var(--muted)}
+.decision-box{border-top:1px solid var(--border);margin-top:1rem;padding-top:1rem}
+.big-status{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin-bottom:.6rem}
+.big-status .badge{font-size:.9rem;padding:.25rem .6rem}
+@media (max-width:767.98px){.wb{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body data-story="E4-S5">
+<a class="skip" href="#main">Skip to main content</a>
+<header class="topbar">
+  <button type="button" class="menu-btn" id="nav-toggle" aria-label="Open navigation" aria-controls="sidenav" aria-expanded="false" data-testid="nav-toggle">
+    <span aria-hidden="true">&#9776;</span><span aria-hidden="true">Menu</span>
+  </button>
+  <a class="brand" href="index.html">PolicyForge <small>Horizon Insurance</small></a>
+  <div class="role">
+    <label for="role-switcher">Demo user</label>
+    <select id="role-switcher" data-testid="role-switcher">
+      <option value="CUSTOMER">Customer (cust-001)</option>
+      <option value="UNDERWRITER">Underwriter (uw-001)</option>
+      <option value="ADMIN">Admin (admin-001)</option>
+    </select>
+    <code class="hdrs" id="hdrs" title="Auth-stub headers sent by the API client"></code>
+  </div>
+</header>
+<div class="layout">
+  <nav id="sidenav" class="sidenav" aria-label="Main navigation" data-testid="side-nav">
+    <p class="nav-caption" id="nav-caption">Customer</p>
+    <ul id="nav-list"></ul>
+  </nav>
+  <main id="main" tabindex="-1">
+    <section class="mock-bar" aria-label="Mockup state controls (not part of the product)">
+      <span class="mock-tag">MOCKUP E4-S5</span>
+      <a href="index.html">All mockups</a>
+      <span class="grp" role="group" aria-label="Screen">Screen:
+  <button type="button" data-goto-screen="apply" aria-pressed="false">Apply (Customer)</button>
+  <button type="button" data-goto-screen="workbench" aria-pressed="false">Workbench (Underwriter)</button>
+  <button type="button" data-goto-screen="review" aria-pressed="false">Underwriting Review (Admin)</button>
+</span>
+<span class="grp" role="group" aria-label="Apply outcome">Apply outcome:
+  <button type="button" data-set-state="outcome:AUTO_BIND" data-default aria-pressed="true">AUTO_BIND</button>
+  <button type="button" data-set-state="outcome:MANUAL_REVIEW" aria-pressed="false">MANUAL_REVIEW</button>
+  <button type="button" data-set-state="outcome:DECLINE" aria-pressed="false">DECLINE</button>
+  <button type="button" data-set-state="outcome:STALE" aria-pressed="false">409 QUOTE_STALE</button>
+</span>
+<span class="grp" role="group" aria-label="Queues">Queues:
+  <button type="button" id="q-empty">Empty queues</button>
+  <button type="button" id="q-reset">Reset data</button>
+  <button type="button" id="q-409">409 INVALID_APPLICATION_STATE</button>
+</span>
+      <p class="req-log" id="req-log" aria-live="polite">No request sent yet.</p>
+    </section>
+    <section id="not-authorised" class="panel" hidden data-testid="not-authorised">
+      <h1>Not authorised</h1>
+      <p>The selected demo user's role cannot open this screen. Switch the demo user in the header.</p>
+      <p class="api">API would answer 403 FORBIDDEN · {"error": {"code": "FORBIDDEN", "message": "Role not allowed on the route", "details": null}}</p>
+    </section>
+    <!-- ===================== APPLY (CUSTOMER) ===================== -->
+    <div class="screen" data-screen="apply" data-roles="CUSTOMER" data-route="/quote">
+      <div class="page-head">
+        <div>
+          <h1>Apply</h1>
+          <p class="route">Route: /apply/<span class="q-id">7c9e6679-7425-40de-944b-e07fc1f90ae7</span></p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <section class="panel" aria-labelledby="kyc-h">
+          <h2 id="kyc-h">Applicant details (KYC)</h2>
+          <form id="kyc-form" novalidate>
+            <div class="form-grid">
+              <div class="field full">
+                <label for="kyc-full_name">Full name</label>
+                <input type="text" id="kyc-full_name" name="kyc.full_name" autocomplete="off" data-testid="kyc-full_name">
+              </div>
+              <div class="field">
+                <label for="kyc-date_of_birth">Date of birth</label>
+                <input type="date" id="kyc-date_of_birth" name="kyc.date_of_birth" data-testid="kyc-date_of_birth">
+              </div>
+              <div class="field">
+                <label for="kyc-aadhaar">Aadhaar</label>
+                <span class="hint" id="kyc-aadhaar-hint">12 digits · hidden while typing, shown masked afterwards</span>
+                <input type="password" inputmode="numeric" autocomplete="off" id="kyc-aadhaar" name="kyc.aadhaar" data-hint-id="kyc-aadhaar-hint" aria-describedby="kyc-aadhaar-hint" data-testid="kyc-aadhaar">
+              </div>
+              <div class="field">
+                <label for="kyc-pan">PAN</label>
+                <span class="hint" id="kyc-pan-hint">Format AAAAA9999A · hidden while typing</span>
+                <input type="password" autocomplete="off" id="kyc-pan" name="kyc.pan" data-hint-id="kyc-pan-hint" aria-describedby="kyc-pan-hint" data-testid="kyc-pan">
+              </div>
+              <div class="field full">
+                <label for="kyc-address">Address</label>
+                <textarea id="kyc-address" name="kyc.address" rows="2" data-testid="kyc-address"></textarea>
+              </div>
+            </div>
+            <div id="apply-alert" style="margin-top:1rem"></div>
+            <div class="actions">
+              <div class="act">
+                <button type="submit" class="btn btn-primary" data-testid="submit-application" data-api="POST /api/applications">Submit application</button>
+                <span class="api">POST /api/applications</span>
+              </div>
+              <div class="act">
+                <button type="button" class="btn" id="fill-synthetic" data-testid="fill-synthetic">Fill synthetic values</button>
+                <span class="api">mockup helper · Test Customer 01</span>
+              </div>
+              <div class="act">
+                <button type="button" class="btn" id="fill-badpan">Use PAN ABC123</button>
+                <span class="api">mockup helper · 422 example</span>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <div>
+          <section class="panel" aria-labelledby="quote-sum-h">
+            <h2 id="quote-sum-h">Quote</h2>
+            <dl class="kv">
+              <dt>Quote id</dt><dd><code class="q-id">7c9e6679-7425-40de-944b-e07fc1f90ae7</code></dd>
+              <dt>Product</dt><dd>Motor (<code>MOTOR</code>)</dd>
+              <dt>Premium</dt><dd class="num">₹14,322.00</dd>
+              <dt>Rule version</dt><dd>Rule version v1</dd>
+            </dl>
+            <span class="api">GET /api/quotes/{quote_id}</span>
+          </section>
+          <section class="panel" aria-labelledby="decision-h" aria-live="polite">
+            <h2 id="decision-h">Decision</h2>
+            <div id="decision-empty" class="empty">Submit the application to see the underwriting decision.</div>
+            <div id="decision" hidden data-testid="application-result"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== WORKBENCH (UNDERWRITER) ===================== -->
+    <div class="screen" data-screen="workbench" data-roles="UNDERWRITER" data-route="/underwriter/queue">
+      <div class="page-head">
+        <div>
+          <h1>Workbench</h1>
+          <p class="route">Route: /underwriter/queue · manual review queue</p>
+        </div>
+      </div>
+      <div class="wb">
+        <section class="panel" aria-labelledby="wq-h">
+          <h2 id="wq-h">Manual review queue</h2>
+          <span class="api" style="margin:-.5rem 0 .6rem">GET /api/underwriting/queue?status=MANUAL_REVIEW</span>
+          <div id="wq"></div>
+        </section>
+        <section class="panel" aria-labelledby="case-h">
+          <h2 id="case-h">Case detail</h2>
+          <div id="case-empty" class="empty">Select a case from the queue.</div>
+          <div id="case" hidden data-testid="case-detail"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- ===================== UNDERWRITING REVIEW (ADMIN) ===================== -->
+    <div class="screen" data-screen="review" data-roles="ADMIN" data-route="/admin/underwriting">
+      <div class="page-head">
+        <div>
+          <h1>Underwriting Review</h1>
+          <p class="route">Route: /admin/underwriting · queue review and DECLINE override</p>
+        </div>
+        <div class="field" style="min-width:14rem">
+          <label for="rq-status">Show</label>
+          <select id="rq-status" data-testid="queue-status-filter" data-api="GET /api/underwriting/queue?status=">
+            <option value="">All (MANUAL_REVIEW + DECLINED)</option>
+            <option value="DECLINED" selected>DECLINED</option>
+            <option value="MANUAL_REVIEW">MANUAL_REVIEW</option>
+          </select>
+          <span class="api" id="rq-api">GET /api/underwriting/queue?status=DECLINED</span>
+        </div>
+      </div>
+      <div id="rq-alert"></div>
+      <section class="panel" aria-labelledby="rq-h">
+        <h2 id="rq-h" class="sr-only">Queue</h2>
+        <div id="rq"></div>
+      </section>
+
+      <dialog id="ovr-dlg" aria-labelledby="ovr-h" data-testid="override-dialog">
+        <form id="ovr-form" novalidate>
+          <div class="dlg-body">
+            <h2 id="ovr-h">Override DECLINE</h2>
+            <p class="small">Application <code id="ovr-app">—</code> · moves the application from <strong>DECLINED</strong> to <strong>AUTO_BIND</strong>. Audited as <code>UW_OVERRIDE_DECLINE</code> with your actor id.</p>
+            <div class="field" style="margin-bottom:.8rem">
+              <label for="ovr-reason">Reason code</label>
+              <select id="ovr-reason" name="reason_code" data-testid="override-reason">
+                <option value="">Select a reason code</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="ovr-comment">Comment</label>
+              <span class="hint" id="ovr-comment-hint">At least 10 characters. Stored in the audit record.</span>
+              <textarea id="ovr-comment" name="comment" rows="3" data-hint-id="ovr-comment-hint" aria-describedby="ovr-comment-hint ovr-count" data-testid="override-comment"></textarea>
+              <span class="counter" id="ovr-count">0 / 10 characters minimum</span>
+            </div>
+            <div id="ovr-alert" style="margin-top:.8rem"></div>
+            <span class="api">POST /api/underwriting/applications/{application_id}/override</span>
+          </div>
+          <div class="dlg-foot">
+            <button type="button" class="btn" id="ovr-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="ovr-submit" disabled data-testid="override-submit" data-api="POST /api/underwriting/applications/{application_id}/override">Override to AUTO_BIND</button>
+          </div>
+        </form>
+      </dialog>
+    </div>
+  </main>
+</div>
+<div id="live" class="sr-only" aria-live="polite"></div>
+<script>
+"use strict";
+/* ---------------- shared mockup shell (identical in every mockup) ---------------- */
+const PF = (() => {
+  const ACTORS = { CUSTOMER: "cust-001", UNDERWRITER: "uw-001", ADMIN: "admin-001" };
+  const NAV = {
+    CUSTOMER: [["Get a Quote", "E3-S3.html", "/quote"], ["My Policies", "E5-S3.html", "/policies"]],
+    UNDERWRITER: [["Workbench", "E4-S5.html#workbench", "/underwriter/queue"]],
+    ADMIN: [["Product Catalog", "E2-S4.html", "/admin/catalog"], ["Underwriting Review", "E4-S5.html#review", "/admin/underwriting"], ["Portfolio", "E9-S2.html", "/admin/portfolio"]]
+  };
+  const CAPTION = { CUSTOMER: "Customer", UNDERWRITER: "Underwriter", ADMIN: "Admin" };
+  const KEY = "policyforge.demoRole";
+  const sel = document.getElementById("role-switcher");
+  const nav = document.getElementById("sidenav");
+  const toggle = document.getElementById("nav-toggle");
+  let activeRoute = window.PF_ACTIVE_ROUTE || "";
+  let currentScreen = null;
+  /* Display-only formatting of decimal strings. The UI never does money arithmetic (NFR-01). */
+  const INR = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  function inr(s) { return INR.format(Number(s)); }
+  function signedInr(s) { return (String(s).startsWith("-") ? "−" : "+") + INR.format(Math.abs(Number(s))); }
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "3b1f6f0e-8a4c-4d8e-9a7b-0c2d4e6f8a10";
+  }
+  function role() { return sel.value; }
+  function headers() { return { "X-Actor-Id": ACTORS[role()], "X-Actor-Role": role(), "X-Correlation-ID": uuid() }; }
+  function badge(status, label) {
+    const s = document.createElement("span");
+    s.className = "badge b-" + status; s.textContent = label || status; s.setAttribute("data-testid", "status-badge");
+    return s;
+  }
+  function badgeHtml(status, label) { return '<span class="badge b-' + status + '" data-testid="status-badge">' + (label || status) + "</span>"; }
+  /* Records the request the real API client would send (no network). Never pass raw PII here. */
+  function log(method, path, body, status) {
+    const h = headers();
+    const txt = method + " " + path + (status ? "  → " + status : "") + "\n" +
+      "X-Actor-Id: " + h["X-Actor-Id"] + "  X-Actor-Role: " + h["X-Actor-Role"] + "  X-Correlation-ID: " + h["X-Correlation-ID"] +
+      (body ? "\nbody: " + JSON.stringify(body) : "");
+    document.getElementById("req-log").textContent = txt;
+    return h;
+  }
+  function announce(msg) { const l = document.getElementById("live"); l.textContent = ""; setTimeout(() => { l.textContent = msg; }, 30); }
+  function renderNav(r) {
+    const ul = document.getElementById("nav-list"); ul.innerHTML = "";
+    document.getElementById("nav-caption").textContent = CAPTION[r];
+    NAV[r].forEach(([label, href, route]) => {
+      const li = document.createElement("li"); const a = document.createElement("a");
+      a.href = href; a.textContent = label; a.dataset.route = route; a.setAttribute("data-testid", "nav-" + route.replace(/\W+/g, "-").replace(/^-|-$/g, ""));
+      if (route === activeRoute) a.setAttribute("aria-current", "page");
+      a.addEventListener("click", () => closeNav());
+      li.appendChild(a); ul.appendChild(li);
+    });
+  }
+  function allowed(el, r) { return !el.dataset.roles || el.dataset.roles.split(" ").includes(r); }
+  function applyScreens() {
+    const screens = Array.from(document.querySelectorAll(".screen"));
+    const r = role();
+    let cur = screens.find(s => s.dataset.screen === currentScreen && allowed(s, r)) || screens.find(s => allowed(s, r)) || null;
+    screens.forEach(s => { s.hidden = s !== cur; });
+    document.getElementById("not-authorised").hidden = !!cur || screens.length === 0;
+    currentScreen = cur ? cur.dataset.screen : currentScreen;
+    if (cur && cur.dataset.route) { activeRoute = cur.dataset.route; }
+    document.querySelectorAll("[data-goto-screen]").forEach(b => b.setAttribute("aria-pressed", String(!!cur && b.dataset.gotoScreen === cur.dataset.screen)));
+    renderNav(r);
+    document.dispatchEvent(new CustomEvent("pf:screen", { detail: currentScreen }));
+  }
+  function setRole(r) {
+    sel.value = r;
+    try { localStorage.setItem(KEY, r); } catch (e) { /* storage unavailable in file:// on some browsers */ }
+    document.getElementById("hdrs").textContent = "X-Actor-Id: " + ACTORS[r] + " · X-Actor-Role: " + r;
+    applyScreens();
+    document.dispatchEvent(new CustomEvent("pf:role", { detail: r }));
+  }
+  function gotoScreen(name) {
+    currentScreen = name;
+    const s = document.querySelector('.screen[data-screen="' + name + '"]');
+    if (s && !allowed(s, role())) { setRole(s.dataset.roles.split(" ")[0]); } else { applyScreens(); }
+  }
+  function setState(group, val) {
+    document.querySelectorAll("[data-when]").forEach(el => {
+      const conds = el.dataset.when.split(" ");
+      const mine = conds.filter(c => c.startsWith(group + ":"));
+      if (mine.length) el.hidden = !mine.includes(group + ":" + val);
+    });
+    document.querySelectorAll('[data-set-state^="' + group + ':"]').forEach(b => b.setAttribute("aria-pressed", String(b.dataset.setState === group + ":" + val)));
+    document.dispatchEvent(new CustomEvent("pf:state", { detail: { group, val } }));
+  }
+  function openNav() { nav.classList.add("open"); toggle.setAttribute("aria-expanded", "true"); const f = nav.querySelector("a"); if (f) f.focus(); }
+  function closeNav() { if (!nav.classList.contains("open")) return; nav.classList.remove("open"); toggle.setAttribute("aria-expanded", "false"); }
+  function fieldError(input, msg) {
+    const id = input.id + "-error";
+    let e = document.getElementById(id);
+    if (!msg) { input.removeAttribute("aria-invalid"); if (e) e.remove(); input.setAttribute("aria-describedby", (input.dataset.hintId || "")); return; }
+    if (!e) { e = document.createElement("p"); e.id = id; e.className = "err"; e.setAttribute("data-testid", "error-" + input.id); input.insertAdjacentElement("afterend", e); }
+    e.textContent = msg;
+    input.setAttribute("aria-invalid", "true");
+    input.setAttribute("aria-describedby", ((input.dataset.hintId || "") + " " + id).trim());
+  }
+  function init() {
+    toggle.addEventListener("click", () => nav.classList.contains("open") ? closeNav() : openNav());
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && nav.classList.contains("open")) { closeNav(); toggle.focus(); } });
+    sel.addEventListener("change", () => { setRole(sel.value); announce("Demo user switched to " + sel.options[sel.selectedIndex].text); });
+    document.querySelectorAll("[data-set-state]").forEach(b => b.addEventListener("click", () => { const [g, v] = b.dataset.setState.split(":"); setState(g, v); }));
+    document.querySelectorAll("[data-goto-screen]").forEach(b => b.addEventListener("click", () => gotoScreen(b.dataset.gotoScreen)));
+    window.addEventListener("hashchange", () => { const h = location.hash.replace("#", ""); if (h && document.querySelector('.screen[data-screen="' + h + '"]')) gotoScreen(h); });
+    const hash = location.hash.replace("#", "");
+    if (hash && document.querySelector('.screen[data-screen="' + hash + '"]')) currentScreen = hash;
+    let stored = null; try { stored = localStorage.getItem(KEY); } catch (e) { stored = null; }
+    let r = ACTORS[stored] ? stored : (window.PF_DEFAULT_ROLE || "CUSTOMER");
+    const want = currentScreen && document.querySelector('.screen[data-screen="' + currentScreen + '"]');
+    if (want && !allowed(want, r)) r = want.dataset.roles.split(" ")[0];
+    else if (!want && window.PF_DEFAULT_ROLE && !stored) r = window.PF_DEFAULT_ROLE;
+    setRole(r);
+    document.querySelectorAll("[data-set-state][data-default]").forEach(b => { const [g, v] = b.dataset.setState.split(":"); setState(g, v); });
+  }
+  return { inr, signedInr, uuid, role, headers, log, badge, badgeHtml, announce, setState, setRole, gotoScreen, fieldError, init, ACTORS };
+})();
+</script>
+<script>
+"use strict";
+/* ---------------- page script: E4-S5 ---------------- */
+window.PF_ACTIVE_ROUTE = "/quote";
+/* v1 reason codes (descriptions come from the rule version, never hard-coded in the real UI) */
+const REASONS = {
+  "MO-UW-001": "Vehicle older than 15 years", "MO-UW-002": "Vehicle older than 10 years", "MO-UW-003": "Sum insured above 2500000.00",
+  "MO-UW-900": "Underwriter approved", "MO-UW-901": "Admin override: risk accepted", "MO-UW-902": "Underwriter declined",
+  "TL-UW-003": "Pre-existing condition declared", "TL-UW-900": "Underwriter approved", "TL-UW-901": "Admin override: risk accepted", "TL-UW-902": "Underwriter declined"
+};
+const QUOTE_ID = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
+/* -------- Apply -------- */
+let outcome = "AUTO_BIND";
+document.addEventListener("pf:state", e => { if (e.detail.group === "outcome") outcome = e.detail.val; });
+const $ = id => document.getElementById(id);
+$("fill-synthetic").addEventListener("click", () => {
+  $("kyc-full_name").value = "Test Customer 01"; $("kyc-date_of_birth").value = "1996-04-12";
+  $("kyc-aadhaar").value = ["9999", "0000", "0001"].join(""); $("kyc-pan").value = ["AAAAA", "0001", "A"].join("");
+  $("kyc-address").value = "1 Sample Street, Testville";
+});
+$("fill-badpan").addEventListener("click", () => { $("fill-synthetic").click(); $("kyc-pan").value = "ABC123"; });
+function kycErrors() {
+  const d = [];
+  if (!$("kyc-full_name").value.trim()) d.push({ field: "kyc.full_name", code: "REQUIRED" });
+  if (!$("kyc-date_of_birth").value) d.push({ field: "kyc.date_of_birth", code: "REQUIRED" });
+  if (!/^\d{12}$/.test($("kyc-aadhaar").value)) d.push({ field: "kyc.aadhaar", code: $("kyc-aadhaar").value ? "INVALID_FORMAT" : "REQUIRED" });
+  if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test($("kyc-pan").value)) d.push({ field: "kyc.pan", code: $("kyc-pan").value ? "INVALID_FORMAT" : "REQUIRED" });
+  if (!$("kyc-address").value.trim()) d.push({ field: "kyc.address", code: "REQUIRED" });
+  return d;
+}
+const KYC_MSG = { "kyc.aadhaar": { INVALID_FORMAT: "Aadhaar must be 12 digits" }, "kyc.pan": { INVALID_FORMAT: "PAN must match AAAAA9999A" } };
+function maskAadhaar(v) { return "XXXX-XXXX-" + v.slice(-4); }
+function maskPan(v) { return "XXXXX" + v.slice(5, 9) + "X"; }
+$("kyc-form").addEventListener("submit", e => {
+  e.preventDefault();
+  ["kyc-full_name", "kyc-date_of_birth", "kyc-aadhaar", "kyc-pan", "kyc-address"].forEach(i => PF.fieldError($(i), null));
+  $("apply-alert").innerHTML = "";
+  const body = { quote_id: QUOTE_ID, kyc: { full_name: $("kyc-full_name").value, date_of_birth: $("kyc-date_of_birth").value, aadhaar: "***", pan: "***", address: $("kyc-address").value } };
+  const errs = kycErrors();
+  if (errs.length) {
+    PF.log("POST", "/api/applications", body, "422 VALIDATION_ERROR");
+    errs.forEach(d => { const el = $(d.field.replace(".", "-")); PF.fieldError(el, d.code + " — " + ((KYC_MSG[d.field] || {})[d.code] || "Required")); });
+    $("apply-alert").innerHTML = '<div class="alert alert-error" role="alert"><p><strong class="code">422 VALIDATION_ERROR</strong> — no decision was made. Correct the highlighted fields.</p></div>';
+    $("decision").hidden = true; $("decision-empty").hidden = false;
+    $(errs[0].field.replace(".", "-")).focus(); return;
+  }
+  if (outcome === "STALE") {
+    PF.log("POST", "/api/applications", body, "409 QUOTE_STALE");
+    $("apply-alert").innerHTML = '<div class="alert alert-error" role="alert"><p><strong class="code">409 QUOTE_STALE</strong> — MOTOR has a newer active rule version than this quote (v1). Get a new quote to continue.</p><a class="btn btn-sm" href="E3-S3.html">Get a new quote</a></div>';
+    return;
+  }
+  const codes = outcome === "AUTO_BIND" ? [] : outcome === "MANUAL_REVIEW" ? ["MO-UW-002"] : ["MO-UW-001", "MO-UW-002"];
+  const status = outcome === "DECLINE" ? "DECLINED" : outcome;
+  const resp = { application_id: "3f5c2a9e-8d41-4b6f-9e2a-7c1d0b4e6a52", status, decision: outcome, reason_codes: codes, rule_version: 1,
+    kyc: { full_name: "Test Customer 01", aadhaar_masked: maskAadhaar($("kyc-aadhaar").value), pan_masked: maskPan($("kyc-pan").value) } };
+  PF.log("POST", "/api/applications", body, "201 status " + status);
+  const reasonHtml = codes.length
+    ? '<ul class="reason-list" data-testid="reason-codes">' + codes.map(c => "<li><code>" + c + "</code> — " + REASONS[c] + "</li>").join("") + "</ul>"
+    : '<p class="small muted">No reason codes — no underwriting rule matched.</p>';
+  const next = outcome === "AUTO_BIND"
+    ? '<div class="actions"><div class="act"><button type="button" class="btn btn-primary" id="issue-btn" data-testid="issue-policy" data-api="POST /api/applications/{application_id}/issue">Issue policy</button><span class="api">POST /api/applications/{application_id}/issue</span></div></div><div id="issue-result"></div>'
+    : outcome === "MANUAL_REVIEW" ? '<p class="small">An underwriter will review this application. You will be able to issue the policy once it is approved.</p>'
+    : '<p class="small">This application cannot be issued. An admin may review declined applications.</p>';
+  $("decision").innerHTML =
+    '<div class="big-status">' + PF.badgeHtml(resp.decision) + (resp.status !== resp.decision ? '<span class="small muted">application status</span> ' + PF.badgeHtml(resp.status) : "") + "</div>" +
+    '<dl class="kv"><dt>Application id</dt><dd><code>' + resp.application_id + "</code></dd>" +
+    "<dt>Rule version</dt><dd>Rule version v" + resp.rule_version + "</dd>" +
+    "<dt>Aadhaar</dt><dd class='mono' data-testid='aadhaar-masked'>" + resp.kyc.aadhaar_masked + "</dd>" +
+    "<dt>PAN</dt><dd class='mono' data-testid='pan-masked'>" + resp.kyc.pan_masked + "</dd></dl>" +
+    '<h3 style="margin-top:.8rem">Reason codes</h3>' + reasonHtml + next;
+  $("decision-empty").hidden = true; $("decision").hidden = false;
+  /* clear raw PII from the inputs after submit */
+  $("kyc-aadhaar").value = ""; $("kyc-pan").value = "";
+  PF.announce("Decision " + resp.decision);
+  const ib = $("issue-btn");
+  if (ib) ib.addEventListener("click", () => {
+    PF.log("POST", "/api/applications/" + resp.application_id + "/issue", null, "201 {policy_number: \"MO-2026-000001\", status: \"ACTIVE\"}");
+    ib.disabled = true;
+    $("issue-result").innerHTML = '<div class="alert alert-ok" role="status"><p>Policy <strong>MO-2026-000001</strong> issued ' + PF.badgeHtml("ACTIVE") + ' · premium ₹14,322.00 paid at issuance.</p><a href="E5-S3.html">View in My Policies</a></div>';
+  });
+});
+
+/* -------- Queue data (fixture) -------- */
+function freshCases() {
+  return [
+    { application_id: "a52d6c1e-3b7f-4e2a-9c58-1f0e7d4b2a63", product: "MOTOR", status: "MANUAL_REVIEW", reason_codes: ["MO-UW-002"], rule_version: 1,
+      submitted_at: "2026-09-21T10:42:00Z", customer_id: "cust-001", full_name: "Test Customer 01", aadhaar_masked: "XXXX-XXXX-0001", pan_masked: "XXXXX0001X",
+      inputs: "owner_age 30 · vehicle_age_years 12 · engine_cc 1200 · zone A · ncb_percent 20", sum_insured: "500000.00", premium: "19334.70",
+      status_history: [["SUBMITTED", "2026-09-21 10:42"], ["UNDERWRITING", "2026-09-21 10:42"], ["MANUAL_REVIEW", "2026-09-21 10:42"]],
+      audit: [["SYSTEM", "SYSTEM", "Automatic decision MANUAL_REVIEW (MO-UW-002)", "2026-09-21 10:42"]] },
+    { application_id: "b7e3f0a4-6c21-4d9b-8a17-5e2c9f3d1b80", product: "MOTOR", status: "MANUAL_REVIEW", reason_codes: ["MO-UW-003"], rule_version: 1,
+      submitted_at: "2026-09-24T15:08:00Z", customer_id: "cust-002", full_name: "Test Customer 02", aadhaar_masked: "XXXX-XXXX-0002", pan_masked: "XXXXX0002X",
+      inputs: "owner_age 44 · vehicle_age_years 2 · engine_cc 1800 · zone B · ncb_percent 35", sum_insured: "3000000.00", premium: "75562.50",
+      status_history: [["SUBMITTED", "2026-09-24 15:08"], ["UNDERWRITING", "2026-09-24 15:08"], ["MANUAL_REVIEW", "2026-09-24 15:08"]],
+      audit: [["SYSTEM", "SYSTEM", "Automatic decision MANUAL_REVIEW (MO-UW-003)", "2026-09-24 15:08"]] },
+    { application_id: "c1d9a7b3-2e5f-4a86-b0c4-9d3e8f1a7c25", product: "TERM_LIFE", status: "MANUAL_REVIEW", reason_codes: ["TL-UW-003"], rule_version: 1,
+      submitted_at: "2026-09-27T09:15:00Z", customer_id: "cust-003", full_name: "Test Customer 03", aadhaar_masked: "XXXX-XXXX-0003", pan_masked: "XXXXX0003X",
+      inputs: "age 35 · term_years 20 · smoker false · pre-existing condition declared", sum_insured: "5000000.00", premium: "9900.00",
+      status_history: [["SUBMITTED", "2026-09-27 09:15"], ["UNDERWRITING", "2026-09-27 09:15"], ["MANUAL_REVIEW", "2026-09-27 09:15"]],
+      audit: [["SYSTEM", "SYSTEM", "Automatic decision MANUAL_REVIEW (TL-UW-003)", "2026-09-27 09:15"]] },
+    { application_id: "d45e0b8c-7a13-4f2d-a9e6-3c8b1d0f5e74", product: "MOTOR", status: "DECLINED", reason_codes: ["MO-UW-001", "MO-UW-002"], rule_version: 1,
+      submitted_at: "2026-09-18T11:30:00Z", customer_id: "cust-004", full_name: "Test Customer 04", aadhaar_masked: "XXXX-XXXX-0004", pan_masked: "XXXXX0004X",
+      inputs: "owner_age 52 · vehicle_age_years 17 · engine_cc 1400 · zone B · ncb_percent 0", sum_insured: "200000.00", premium: "10912.00",
+      status_history: [["SUBMITTED", "2026-09-18 11:30"], ["UNDERWRITING", "2026-09-18 11:30"], ["DECLINED", "2026-09-18 11:30"]],
+      audit: [["SYSTEM", "SYSTEM", "Automatic decision DECLINE (MO-UW-001, MO-UW-002)", "2026-09-18 11:30"]] }
+  ];
+}
+let cases = freshCases();
+let selectedCase = null;
+let force409 = false;
+const short = id => id.slice(0, 8);
+function queueTable(list, opts) {
+  if (!list.length) return '<div class="empty" data-testid="queue-empty">' + opts.empty + "</div>";
+  return '<div class="table-wrap"><table class="rtable" data-testid="' + opts.testid + '"><caption class="sr-only">' + opts.caption + "</caption>" +
+    '<thead><tr><th scope="col">Application</th><th scope="col">Product</th><th scope="col">Status</th><th scope="col">Reason codes</th><th scope="col">Rule</th><th scope="col">Submitted</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody>' +
+    list.map(c => '<tr data-testid="queue-row-' + short(c.application_id) + '">' +
+      '<td data-label="Application"><code>' + short(c.application_id) + "…</code></td>" +
+      '<td data-label="Product">' + c.product + "</td>" +
+      '<td data-label="Status">' + PF.badgeHtml(c.status) + "</td>" +
+      '<td data-label="Reason codes"><code>' + c.reason_codes.join(", ") + "</code></td>" +
+      '<td data-label="Rule">v' + c.rule_version + "</td>" +
+      '<td data-label="Submitted" class="num">' + c.submitted_at.slice(0, 10) + "</td>" +
+      '<td data-label="Actions" class="cell-actions">' + opts.action(c) + "</td></tr>").join("") + "</tbody></table></div>";
+}
+/* -------- Workbench -------- */
+function renderWorkbench() {
+  const list = cases.filter(c => c.status === "MANUAL_REVIEW");
+  $("wq").innerHTML = queueTable(list, { testid: "manual-queue", caption: "Manual review cases, oldest first", empty: "No cases awaiting manual review.",
+    action: c => '<button type="button" class="btn btn-sm" data-open="' + c.application_id + '" aria-label="Open case ' + short(c.application_id) + '" data-api="GET /api/applications/' + c.application_id + '">Open</button>' });
+  $("wq").querySelectorAll("[data-open]").forEach(b => b.addEventListener("click", () => openCase(b.dataset.open)));
+}
+function openCase(id) {
+  const c = cases.find(x => x.application_id === id); selectedCase = c;
+  PF.log("GET", "/api/applications/" + id, null, "200");
+  const prefix = c.product === "MOTOR" ? "MO" : "TL";
+  $("case").innerHTML =
+    '<div class="big-status">' + PF.badgeHtml(c.status) + ' <span class="small muted">Rule version v' + c.rule_version + "</span></div>" +
+    '<dl class="kv"><dt>Application id</dt><dd><code>' + c.application_id + "</code></dd>" +
+    "<dt>Applicant</dt><dd>" + c.full_name + " (<code>" + c.customer_id + "</code>)</dd>" +
+    "<dt>Aadhaar</dt><dd class='mono' data-testid='case-aadhaar'>" + c.aadhaar_masked + "</dd>" +
+    "<dt>PAN</dt><dd class='mono' data-testid='case-pan'>" + c.pan_masked + "</dd>" +
+    "<dt>Product</dt><dd>" + c.product + "</dd><dt>Risk inputs</dt><dd class='small'>" + c.inputs + "</dd>" +
+    "<dt>Sum insured</dt><dd class='num'>" + PF.inr(c.sum_insured) + "</dd><dt>Quoted premium</dt><dd class='num'>" + PF.inr(c.premium) + "</dd></dl>" +
+    '<h3 style="margin-top:1rem">Reason codes</h3><ul class="reason-list">' + c.reason_codes.map(r => "<li><code>" + r + "</code> — " + REASONS[r] + "</li>").join("") + "</ul>" +
+    auditHtml(c) +
+    (c.status === "MANUAL_REVIEW" ? decisionForm(prefix) : '<div class="alert alert-info" role="status"><p>Decision recorded — this case has left the manual review queue.</p></div>');
+  $("case-empty").hidden = true; $("case").hidden = false;
+  const form = $("dec-form"); if (form) bindDecision(form, c);
+}
+function decisionForm(prefix) {
+  return '<form id="dec-form" class="decision-box" novalidate><h3>Decision</h3>' +
+    '<fieldset class="field" id="dec-codes-fs" aria-describedby="dec-codes-hint"><legend>Reason codes</legend><span class="hint" id="dec-codes-hint">From the case\'s rule version (v1)</span>' +
+    [prefix + "-UW-900", prefix + "-UW-902"].map(c => '<label class="choice"><input type="checkbox" name="reason_codes" value="' + c + '" data-testid="reason-' + c + '"> <code>' + c + "</code> " + REASONS[c] + "</label>").join("") + "</fieldset>" +
+    '<div class="field" style="margin-top:.8rem"><label for="dec-comment">Comment</label><textarea id="dec-comment" name="comment" rows="3" data-testid="decision-comment"></textarea></div>' +
+    '<div id="dec-alert" style="margin-top:.8rem"></div>' +
+    '<div class="actions"><div class="act"><button type="button" class="btn btn-primary" data-decision="APPROVE" data-testid="approve" data-api="POST /api/underwriting/applications/{application_id}/decision">Approve</button><span class="api">POST …/decision {decision: "APPROVE"}</span></div>' +
+    '<div class="act"><button type="button" class="btn btn-danger" data-decision="DECLINE" data-testid="decline" data-api="POST /api/underwriting/applications/{application_id}/decision">Decline</button><span class="api">POST …/decision {decision: "DECLINE"}</span></div></div></form>';
+}
+function bindDecision(form, c) {
+  form.querySelectorAll("[data-decision]").forEach(btn => btn.addEventListener("click", () => {
+    const decision = btn.dataset.decision;
+    const codes = Array.from(form.querySelectorAll('input[name="reason_codes"]:checked')).map(i => i.value);
+    const comment = $("dec-comment").value.trim();
+    const path = "/api/underwriting/applications/" + c.application_id + "/decision";
+    const body = { decision, reason_codes: codes, comment };
+    if (force409) {
+      PF.log("POST", path, body, "409 INVALID_APPLICATION_STATE");
+      $("dec-alert").innerHTML = '<div class="alert alert-error" role="alert"><p><strong class="code">409 INVALID_APPLICATION_STATE</strong> — this application is no longer MANUAL_REVIEW (another underwriter decided it). Refresh the queue.</p></div>';
+      return;
+    }
+    if (!codes.length) {
+      PF.log("POST", path, body, "422 VALIDATION_ERROR");
+      $("dec-alert").innerHTML = '<div class="alert alert-error" role="alert" id="dec-codes-error"><p><strong class="code">422 VALIDATION_ERROR</strong> — <code>reason_codes</code>: <code>REQUIRED</code>. Choose at least one reason code.</p></div>';
+      $("dec-codes-fs").setAttribute("aria-describedby", "dec-codes-hint dec-codes-error");
+      form.querySelector('input[name="reason_codes"]').focus(); return;
+    }
+    const newStatus = decision === "APPROVE" ? "AUTO_BIND" : "DECLINED";
+    PF.log("POST", path, body, "200 status " + newStatus);
+    c.status = newStatus;
+    c.status_history.push([newStatus, "2026-09-29 11:05"]);
+    c.audit.push([PF.ACTORS[PF.role()], PF.role(), (decision === "APPROVE" ? "UW_APPROVE" : "UW_DECLINE") + " " + codes.join(", "), "2026-09-29 11:05", comment]);
+    renderWorkbench(); openCase(c.application_id); renderReview();
+    PF.announce((decision === "APPROVE" ? "Approved" : "Declined") + "; case removed from the queue");
+  }));
+}
+/* audit rows render "UW_APPROVE by uw-001 (UNDERWRITER)" */
+function auditHtml(c) {
+  return '<h3 style="margin-top:1rem">Audit trail</h3><span class="api" style="margin:-.3rem 0 .4rem">GET /api/underwriting/applications/{application_id}/audit</span>' +
+    '<ol class="timeline" data-testid="audit-trail">' + c.audit.map(a => {
+      const action = a[2].split(" ")[0];
+      const who = a[0] === "SYSTEM" ? "decided_by <code>SYSTEM</code>" : "by <code>" + a[0] + "</code> (" + a[1] + ")";
+      const rest = a[2].split(" ").slice(1).join(" ");
+      return "<li><strong><code>" + action + "</code></strong> " + who + " · " + rest + '<br><span class="small muted">' + a[3] + (a[4] ? " · comment: “" + a[4] + "”" : "") + "</span></li>";
+    }).join("") + "</ol>";
+}
+/* -------- Admin review -------- */
+function renderReview() {
+  const f = $("rq-status").value;
+  $("rq-api").textContent = "GET /api/underwriting/queue" + (f ? "?status=" + f : "");
+  const list = cases.filter(c => (f ? c.status === f : (c.status === "MANUAL_REVIEW" || c.status === "DECLINED")) || c.overridden);
+  $("rq").innerHTML = queueTable(list, { testid: "review-queue", caption: "Underwriting queue", empty: f === "DECLINED" ? "No declined applications." : "No applications in the queue.",
+    action: c => c.status === "DECLINED"
+      ? '<button type="button" class="btn btn-sm btn-primary" data-override="' + c.application_id + '" aria-label="Override decline ' + short(c.application_id) + '" data-testid="override-' + short(c.application_id) + '" data-api="POST /api/underwriting/applications/' + c.application_id + '/override">Override</button>'
+      : c.overridden ? '<span class="small">Overridden by <code>admin-001</code> · <code>UW_OVERRIDE_DECLINE</code></span>'
+      : '<span class="small muted">Awaiting underwriter</span>' });
+  $("rq").querySelectorAll("[data-override]").forEach(b => b.addEventListener("click", () => openOverride(b.dataset.override)));
+}
+$("rq-status").addEventListener("change", () => { PF.log("GET", $("rq-api").textContent.replace("GET ", "").replace(/^\S+/, m => m), null, "200"); renderReview(); PF.log("GET", $("rq-api").textContent.slice(4), null, "200"); });
+const dlg = $("ovr-dlg"); let ovrCase = null;
+function openOverride(id) {
+  ovrCase = cases.find(c => c.application_id === id);
+  $("ovr-app").textContent = short(id) + "…";
+  const prefix = ovrCase.product === "MOTOR" ? "MO" : "TL";
+  $("ovr-reason").innerHTML = '<option value="">Select a reason code</option><option value="' + prefix + '-UW-901">' + prefix + "-UW-901 — " + REASONS[prefix + "-UW-901"] + '</option><option value="HH-UW-001">HH-UW-001 — (not in this rule version; 422 example)</option>';
+  $("ovr-comment").value = ""; $("ovr-alert").innerHTML = ""; updateOvr();
+  dlg.showModal();
+}
+function updateOvr() {
+  const n = $("ovr-comment").value.trim().length;
+  $("ovr-count").textContent = n + " / 10 characters minimum";
+  $("ovr-submit").disabled = !($("ovr-reason").value && n >= 10);
+}
+$("ovr-comment").addEventListener("input", updateOvr);
+$("ovr-reason").addEventListener("change", updateOvr);
+$("ovr-cancel").addEventListener("click", () => dlg.close());
+$("ovr-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const body = { reason_code: $("ovr-reason").value, comment: $("ovr-comment").value.trim() };
+  const path = "/api/underwriting/applications/" + ovrCase.application_id + "/override";
+  if (body.reason_code.startsWith("HH")) {
+    PF.log("POST", path, body, "422 VALIDATION_ERROR");
+    $("ovr-alert").innerHTML = '<div class="alert alert-error" role="alert" id="ovr-reason-error"><p><strong class="code">422 VALIDATION_ERROR</strong> — <code>reason_code</code>: <code>UNKNOWN_REASON_CODE</code> (not in MOTOR v1 reason codes). Application remains DECLINED.</p></div>';
+    $("ovr-reason").setAttribute("aria-invalid", "true"); $("ovr-reason").setAttribute("aria-describedby", "ovr-reason-error"); return;
+  }
+  PF.log("POST", path, body, "200 status AUTO_BIND");
+  ovrCase.status = "AUTO_BIND"; ovrCase.overridden = true;
+  ovrCase.audit.push(["admin-001", "ADMIN", "UW_OVERRIDE_DECLINE " + body.reason_code, "2026-09-29 11:20", body.comment]);
+  dlg.close(); renderReview(); renderWorkbench();
+  $("rq-alert").innerHTML = '<div class="alert alert-ok" role="status"><p>Application <code>' + short(ovrCase.application_id) + "…</code> overridden to " + PF.badgeHtml("AUTO_BIND") + " · audited as <code>UW_OVERRIDE_DECLINE</code> by <code>admin-001</code>.</p></div>";
+  PF.announce("Override saved. Status AUTO_BIND");
+});
+/* -------- mockup controls -------- */
+$("q-empty").addEventListener("click", () => { cases = []; selectedCase = null; $("case").hidden = true; $("case-empty").hidden = false; renderWorkbench(); renderReview(); });
+$("q-reset").addEventListener("click", () => { cases = freshCases(); force409 = false; $("rq-alert").innerHTML = ""; $("case").hidden = true; $("case-empty").hidden = false; renderWorkbench(); renderReview(); });
+$("q-409").addEventListener("click", () => { force409 = true; PF.gotoScreen("workbench"); if (!cases.find(c => c.status === "MANUAL_REVIEW")) cases = freshCases(); renderWorkbench(); openCase(cases.find(c => c.status === "MANUAL_REVIEW").application_id); });
+document.addEventListener("pf:screen", e => { history.replaceState(null, "", "#" + e.detail); });
+PF.init();
+renderWorkbench();
+renderReview();
+</script>
+</body>
+</html>

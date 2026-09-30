@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Endorse policy · PolicyForge mockup E6-S3</title>
+<!--
+  PolicyForge UI mockup E6-S3 · Endorse policy
+  Self-contained: all CSS/JS inline, no external requests, no real API calls (fixtures only).
+  Field names follow the "API endpoints" table + request/response notes in docs/conventions.md and the
+  owning feature spec (specs/design/api-contracts.md did not exist when this mockup was written).
+  Every interactive element carries data-api="<METHOD> <path>" and a visible caption.
+  The dashed "Mockup" bar at the top of <main> is NOT part of the product: it toggles happy/empty/error states.
+  Responsive: breakpoint 768px. Below it the side nav collapses behind the "Open navigation" button and
+  tables (.rtable) render as stacked cards.
+  Story E6-S3 (AC-06, AC-16, AC-10, AC-22, AC-24). Route: /policies/MO-2026-000001/endorse (CUSTOMER owner, ADMIN).
+  Business date in this mockup: 2026-09-01. Policy MO-2026-000001: premium 15500.00, sum_insured 500000.00, term 2026-03-01 – 2027-02-28.
+  Type selector = the policy rule version's endorsement.allowed_types (MOTOR v1: CHANGE_ADDRESS, ADD_NOMINEE, CHANGE_SUM_INSURED).
+  POST /api/policies/{policy_number}/endorsements?preview=true -> 200 {after, new_premium, premium_delta} (nothing persisted)
+  POST /api/policies/{policy_number}/endorsements            -> 201 {endorsement_id, type, before, after, premium_delta, policy summary (status ENDORSED)}
+     bodies: {"type": "CHANGE_ADDRESS", "address"} · {"type": "ADD_NOMINEE", "nominee_name", "relationship", "share_percent"} ·
+             {"type": "CHANGE_SUM_INSURED", "new_sum_insured"}
+  Preview fixtures: new_sum_insured "600000.00" -> new_premium "18600.00", premium_delta "1537.26" (= (18600.00 - 15500.00) x 181 / 365);
+                    "400000.00" -> "12400.00", "-1537.26".
+  Errors: 422 VALIDATION_ERROR details (type NOT_ALLOWED, new_sum_insured OUT_OF_RANGE / UNCHANGED, nominee_name REQUIRED,
+          share_percent SHARE_EXCEEDS_100, address UNCHANGED); 409 INVALID_POLICY_STATE {current, target}.
+  ASSUMED: preview response also returns unused_days and term_days so the UI can explain the pro-ration without doing arithmetic;
+           the allowed types list comes from GET /api/products/{product}/versions (rules.endorsement.allowed_types) for the policy's rule_version.
+-->
+<style>
+:root{
+  --bg:#f5f6f8;--surface:#ffffff;--surface-2:#f0f2f5;--border:#d5dae1;--border-strong:#aeb6c1;
+  --text:#1b2330;--muted:#4f5967;--accent:#1d4f8f;--accent-hover:#163e71;--accent-soft:#e7eef8;
+  --danger:#9b1c1c;--danger-soft:#fbeaea;--ok:#1d5b34;--ok-soft:#e5f3ea;--warn:#734700;--warn-soft:#fff3dc;
+  --violet:#4a2d86;--violet-soft:#efeaf9;--focus:#1d4f8f;
+  --font:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono","SFMono-Regular",Consolas,monospace;
+  --radius:6px;--nav-w:232px;--header-h:56px;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{font-size:15px;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.45;overflow-x:hidden}
+h1{font-size:1.45rem;margin:0 0 .25rem;font-weight:650;letter-spacing:-.01em}
+h2{font-size:1.1rem;margin:0 0 .75rem;font-weight:650}
+h3{font-size:.98rem;margin:0 0 .5rem;font-weight:650}
+p{margin:0 0 .75rem}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;overflow-wrap:anywhere}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:3px}
+.skip{position:absolute;left:-9999px;top:0;background:var(--surface);padding:.5rem 1rem;z-index:50}
+.skip:focus{left:.5rem;top:.5rem}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ---------- header ---------- */
+.topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
+  min-height:var(--header-h);padding:.5rem 1rem;background:#1f2733;color:#f4f6f9;border-bottom:1px solid #111821}
+.brand{font-weight:700;letter-spacing:.01em;font-size:1.05rem;color:#fff;text-decoration:none;margin-right:auto}
+.brand small{font-weight:400;color:#c4ccd7;margin-left:.4rem;font-size:.8rem}
+.menu-btn{display:none;align-items:center;gap:.4rem;background:transparent;color:#fff;border:1px solid #6b7686;
+  border-radius:var(--radius);padding:.4rem .6rem;font:inherit;cursor:pointer}
+.menu-btn:focus-visible,.role select:focus-visible{outline-color:#9cc2ff}
+.role{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.role label{font-size:.82rem;color:#d8dee7}
+.role select{font:inherit;padding:.35rem .5rem;border-radius:var(--radius);border:1px solid #6b7686;background:#fff;color:var(--text)}
+.hdrs{font-family:var(--mono);font-size:.75rem;color:#d8dee7;background:#2c3645;border-radius:4px;padding:.2rem .45rem}
+
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:var(--nav-w) minmax(0,1fr);min-height:calc(100vh - var(--header-h))}
+.sidenav{background:var(--surface);border-right:1px solid var(--border);padding:1rem .75rem}
+.sidenav ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.15rem}
+.sidenav a{display:block;padding:.55rem .7rem;border-radius:var(--radius);color:var(--text);text-decoration:none}
+.sidenav a:hover{background:var(--surface-2)}
+.sidenav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent);font-weight:650;box-shadow:inset 3px 0 0 var(--accent)}
+.nav-caption{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 .5rem .7rem}
+main{padding:1.25rem 1.5rem 3rem;min-width:0}
+main:focus{outline:none}
+
+/* ---------- mockup bar (not product UI) ---------- */
+.mock-bar{border:1px dashed var(--border-strong);background:#fbfbfc;border-radius:var(--radius);padding:.5rem .7rem;margin-bottom:1.1rem;
+  display:flex;flex-wrap:wrap;gap:.4rem .6rem;align-items:center;font-size:.82rem;color:var(--muted)}
+.mock-tag{font-family:var(--mono);font-weight:700;color:var(--text)}
+.mock-bar .grp{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}
+.mock-bar button{font:inherit;font-size:.78rem;padding:.2rem .5rem;border:1px solid var(--border-strong);background:#fff;border-radius:4px;cursor:pointer;color:var(--text)}
+.mock-bar button[aria-pressed="true"]{background:#1f2733;color:#fff;border-color:#1f2733}
+.req-log{flex-basis:100%;font-family:var(--mono);font-size:.74rem;color:var(--muted);overflow-wrap:anywhere;white-space:pre-wrap;margin:0}
+
+/* ---------- building blocks ---------- */
+.page-head{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:flex-end;justify-content:space-between;margin-bottom:1rem}
+.route{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;margin-bottom:1rem;min-width:0}
+.panel > h2:first-child,.panel > h3:first-child{margin-top:0}
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.75rem}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.8rem .9rem}
+.stat .lbl{font-size:.8rem;color:var(--muted);margin:0}
+.stat .val{font-size:1.4rem;font-weight:650;margin:.1rem 0 0;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:.84rem}
+.row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.stack>*+*{margin-top:.75rem}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:.35rem 1rem;margin:0}
+.kv dt{color:var(--muted);font-size:.86rem}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.api{display:block;font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-top:.25rem;overflow-wrap:anywhere}
+.api::before{content:"\21B3  "}
+.api-inline{font-family:var(--mono);font-size:.72rem;color:var(--muted);overflow-wrap:anywhere}
+
+/* ---------- forms ---------- */
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.9rem 1rem}
+.form-grid .full{grid-column:1/-1}
+.field{display:flex;flex-direction:column;gap:.25rem;min-width:0}
+.field label,.field legend,.lbl-strong{font-weight:600;font-size:.9rem}
+.field .hint{font-size:.78rem;color:var(--muted)}
+.field .fname{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+input[type=text],input[type=date],input[type=number],input[type=password],select,textarea{
+  font:inherit;padding:.5rem .6rem;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff;color:var(--text);width:100%;min-width:0}
+textarea{min-height:5rem;resize:vertical}
+textarea.code{font-family:var(--mono);font-size:.8rem;min-height:14rem}
+input[aria-invalid="true"],select[aria-invalid="true"],textarea[aria-invalid="true"]{border:2px solid var(--danger)}
+.err{color:var(--danger);font-size:.84rem;font-weight:600}
+.err::before{content:"Error: "}
+fieldset{border:1px solid var(--border);border-radius:var(--radius);padding:.6rem .8rem;margin:0;min-width:0}
+fieldset legend{padding:0 .3rem}
+.choice{display:flex;align-items:center;gap:.45rem;padding:.2rem 0}
+.choice input{width:1.05rem;height:1.05rem;margin:0}
+.seg{display:flex;flex-wrap:wrap;gap:.4rem}
+.seg label{display:flex;align-items:center;gap:.4rem;border:1px solid var(--border-strong);border-radius:var(--radius);padding:.45rem .7rem;cursor:pointer;background:#fff}
+.seg input:checked + span{font-weight:650}
+.seg label:has(input:checked){border:2px solid var(--accent);background:var(--accent-soft)}
+
+/* ---------- buttons ---------- */
+.btn{font:inherit;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:.5rem .95rem;border-radius:var(--radius);
+  border:1px solid var(--border-strong);background:#fff;color:var(--text);cursor:pointer;text-decoration:none;min-height:2.4rem}
+.btn:hover{background:var(--surface-2)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn-danger:hover{background:#7e1616}
+.btn-sm{padding:.25rem .6rem;min-height:2rem;font-size:.86rem}
+.btn[disabled],.btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
+.actions{display:flex;flex-wrap:wrap;gap:.6rem;align-items:flex-start;margin-top:1rem}
+.act{display:flex;flex-direction:column}
+
+/* ---------- alerts ---------- */
+.alert{border:1px solid;border-left-width:5px;border-radius:var(--radius);padding:.7rem .9rem;margin-bottom:1rem}
+.alert p:last-child,.alert ul:last-child{margin-bottom:0}
+.alert strong.code{font-family:var(--mono)}
+.alert-error{background:var(--danger-soft);border-color:var(--danger);color:#5f1111}
+.alert-ok{background:var(--ok-soft);border-color:var(--ok);color:#123d22}
+.alert-info{background:var(--accent-soft);border-color:var(--accent);color:#12335e}
+.alert-warn{background:var(--warn-soft);border-color:var(--warn);color:#4d3000}
+.empty{border:1px dashed var(--border-strong);border-radius:var(--radius);padding:1.2rem;text-align:center;color:var(--muted);background:#fbfbfc}
+.loading{display:flex;gap:.5rem;align-items:center;color:var(--muted)}
+.spinner{width:1rem;height:1rem;border:2px solid var(--border-strong);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation:none}}
+
+/* ---------- status badges (text, never colour alone) ---------- */
+.badge{display:inline-flex;align-items:center;gap:.3rem;font-family:var(--mono);font-size:.74rem;font-weight:700;letter-spacing:.03em;
+  padding:.12rem .45rem;border-radius:4px;border:1px solid;white-space:nowrap;background:var(--surface-2);color:var(--text);border-color:var(--border-strong)}
+.badge::before{content:"";width:.45rem;height:.45rem;border-radius:50%;background:currentColor;flex:none}
+.b-ACTIVE,.b-AUTO_BIND,.b-PUBLISHED,.b-PAID,.b-ISSUED{background:var(--ok-soft);color:var(--ok);border-color:#8fc4a1}
+.b-ENDORSED,.b-SUBMITTED,.b-UNDERWRITING{background:var(--accent-soft);color:var(--accent);border-color:#98b5dc}
+.b-LAPSED,.b-MANUAL_REVIEW,.b-UNPAID,.b-IN_GRACE{background:var(--warn-soft);color:var(--warn);border-color:#d9b36a}
+.b-CANCELLED,.b-DECLINE,.b-DECLINED{background:var(--danger-soft);color:var(--danger);border-color:#dc9c9c}
+.b-RENEWED{background:var(--violet-soft);color:var(--violet);border-color:#b7a6dc}
+.b-DRAFT{background:#fff;color:var(--muted);border-style:dashed}
+.b-DRAFT::before{background:transparent;border:1.5px solid currentColor}
+.b-Active{background:#1f2733;color:#fff;border-color:#1f2733}
+.b-CANCELLED::before,.b-DECLINE::before,.b-DECLINED::before{border-radius:1px}
+.b-LAPSED::before,.b-MANUAL_REVIEW::before,.b-UNPAID::before{border-radius:0;transform:rotate(45deg)}
+
+/* ---------- responsive tables → stacked cards ---------- */
+.rtable{width:100%;border-collapse:collapse;background:var(--surface);font-size:.92rem}
+.rtable caption{text-align:left;font-weight:650;padding:0 0 .5rem}
+.rtable th,.rtable td{padding:.55rem .65rem;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+.rtable thead th{background:var(--surface-2);font-size:.8rem;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.04em}
+.rtable tbody tr.selectable{cursor:pointer}
+.rtable tbody tr.selectable:hover,.rtable tbody tr[aria-selected="true"]{background:#f6f9fd}
+.table-wrap{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.table-wrap .rtable tr:last-child td{border-bottom:0}
+
+/* ---------- dialog ---------- */
+dialog{border:1px solid var(--border);border-radius:8px;padding:0;width:min(540px,calc(100vw - 24px));max-height:calc(100vh - 24px);color:var(--text)}
+dialog::backdrop{background:rgba(20,26,36,.55)}
+dialog .dlg-body{padding:1.1rem 1.2rem}
+dialog .dlg-foot{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:flex-end;padding:.8rem 1.2rem;border-top:1px solid var(--border);background:var(--surface-2)}
+
+.timeline{list-style:none;margin:0;padding:0 0 0 .9rem;border-left:2px solid var(--border)}
+.timeline li{position:relative;padding:0 0 .8rem .6rem}
+.timeline li::before{content:"";position:absolute;left:-1.28rem;top:.35rem;width:.6rem;height:.6rem;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+
+/* ---------- breakpoint: 768px ---------- */
+@media (max-width:767.98px){
+  .menu-btn{display:inline-flex}
+  .hdrs{display:none}
+  .brand small{display:none}
+  .layout{display:block}
+  .sidenav{display:none;position:absolute;left:0;right:0;z-index:25;border-right:0;border-bottom:1px solid var(--border);box-shadow:0 8px 20px rgba(0,0,0,.12)}
+  .sidenav.open{display:block}
+  main{padding:1rem .9rem 3rem}
+  .grid-2,.form-grid{grid-template-columns:minmax(0,1fr)}
+  .kv{grid-template-columns:minmax(0,1fr)}
+  .kv dd{margin-bottom:.35rem}
+  .table-wrap{border:0;overflow:visible}
+  .rtable,.rtable tbody,.rtable tr,.rtable td{display:block;width:100%}
+  .rtable thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  .rtable tr{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.65rem;padding:.35rem .2rem}
+  .rtable td{border:0;display:grid;grid-template-columns:minmax(6.5rem,40%) minmax(0,1fr);gap:.5rem;padding:.35rem .6rem}
+  .rtable td::before{content:attr(data-label);font-size:.78rem;color:var(--muted);font-weight:600}
+  .rtable td.cell-actions{grid-template-columns:minmax(0,1fr)}
+  .rtable td.cell-actions::before{display:none}
+  .rtable .num{white-space:normal}
+  .btn{min-height:2.75rem}
+}
+.preview{border:1px solid var(--border);background:var(--surface-2);border-radius:var(--radius);padding:.8rem .9rem;margin-top:.9rem}
+.preview .delta{font-size:1.5rem;font-weight:700;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body data-story="E6-S3">
+<a class="skip" href="#main">Skip to main content</a>
+<header class="topbar">
+  <button type="button" class="menu-btn" id="nav-toggle" aria-label="Open navigation" aria-controls="sidenav" aria-expanded="false" data-testid="nav-toggle">
+    <span aria-hidden="true">&#9776;</span><span aria-hidden="true">Menu</span>
+  </button>
+  <a class="brand" href="index.html">PolicyForge <small>Horizon Insurance</small></a>
+  <div class="role">
+    <label for="role-switcher">Demo user</label>
+    <select id="role-switcher" data-testid="role-switcher">
+      <option value="CUSTOMER">Customer (cust-001)</option>
+      <option value="UNDERWRITER">Underwriter (uw-001)</option>
+      <option value="ADMIN">Admin (admin-001)</option>
+    </select>
+    <code class="hdrs" id="hdrs" title="Auth-stub headers sent by the API client"></code>
+  </div>
+</header>
+<div class="layout">
+  <nav id="sidenav" class="sidenav" aria-label="Main navigation" data-testid="side-nav">
+    <p class="nav-caption" id="nav-caption">Customer</p>
+    <ul id="nav-list"></ul>
+  </nav>
+  <main id="main" tabindex="-1">
+    <section class="mock-bar" aria-label="Mockup state controls (not part of the product)">
+      <span class="mock-tag">MOCKUP E6-S3</span>
+      <a href="index.html">All mockups</a>
+      <span class="grp" role="group" aria-label="Policy state">Policy:
+  <button type="button" data-set-state="pol:ENDORSABLE" data-default aria-pressed="true">ACTIVE (endorsable)</button>
+  <button type="button" data-set-state="pol:CANCELLED" aria-pressed="false">CANCELLED (409 on submit)</button>
+</span>
+<span class="grp" role="group" aria-label="Examples">Examples:
+  <button type="button" id="ex-preview">Preview 600000.00</button>
+  <button type="button" id="ex-422">422: sum insured 99999</button>
+  <button type="button" id="ex-notallowed">422 NOT_ALLOWED</button>
+</span>
+      <p class="req-log" id="req-log" aria-live="polite">No request sent yet.</p>
+    </section>
+    <section id="not-authorised" class="panel" hidden data-testid="not-authorised">
+      <h1>Not authorised</h1>
+      <p>The selected demo user's role cannot open this screen. Switch the demo user in the header.</p>
+      <p class="api">API would answer 403 FORBIDDEN · {"error": {"code": "FORBIDDEN", "message": "Role not allowed on the route", "details": null}}</p>
+    </section>
+    <div class="screen" data-screen="endorse" data-roles="CUSTOMER ADMIN" data-route="/policies">
+      <p><a href="E5-S3.html#detail">&larr; Back to Policy Detail</a></p>
+      <div class="page-head">
+        <div>
+          <h1>Endorse MO-2026-000001</h1>
+          <p class="route">Route: /policies/MO-2026-000001/endorse · business date 2026-09-01</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <section class="panel" aria-labelledby="endorse-h">
+          <h2 id="endorse-h">Change request</h2>
+          <form id="endorse-form" novalidate>
+            <div class="field" style="margin-bottom:1rem">
+              <label for="type">Endorsement type</label>
+              <span class="hint" id="type-hint">Allowed by rule version v1 · <span class="api-inline">rules.endorsement.allowed_types</span></span>
+              <select id="type" name="type" data-hint-id="type-hint" aria-describedby="type-hint" data-testid="endorsement-type">
+                <option value="CHANGE_ADDRESS">CHANGE_ADDRESS — Change address</option>
+                <option value="ADD_NOMINEE">ADD_NOMINEE — Add nominee</option>
+                <option value="CHANGE_SUM_INSURED">CHANGE_SUM_INSURED — Change sum insured</option>
+              </select>
+            </div>
+
+            <div data-type="CHANGE_ADDRESS" class="field">
+              <label for="address">New address</label>
+              <span class="hint" id="address-hint">Current: 1 Sample Street, Testville · max 300 characters</span>
+              <textarea id="address" name="address" rows="2" maxlength="300" data-hint-id="address-hint" aria-describedby="address-hint" data-testid="input-address">2 Sample Road, Testville</textarea>
+            </div>
+
+            <div data-type="ADD_NOMINEE" class="form-grid" hidden>
+              <div class="field full">
+                <label for="nominee_name">Nominee name</label>
+                <input type="text" id="nominee_name" name="nominee_name" data-testid="input-nominee_name">
+              </div>
+              <div class="field">
+                <label for="relationship">Relationship</label>
+                <select id="relationship" name="relationship" data-testid="input-relationship">
+                  <option value="SPOUSE">Spouse</option><option value="CHILD">Child</option><option value="PARENT">Parent</option>
+                  <option value="SIBLING">Sibling</option><option value="OTHER">Other</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="share_percent">Share %</label>
+                <span class="hint" id="share_percent-hint">1–100 · existing nominee shares: 0%</span>
+                <input type="text" inputmode="decimal" id="share_percent" name="share_percent" value="100" data-hint-id="share_percent-hint" aria-describedby="share_percent-hint" data-testid="input-share_percent">
+              </div>
+            </div>
+
+            <div data-type="CHANGE_SUM_INSURED" hidden>
+              <div class="field">
+                <label for="new_sum_insured">Sum insured</label>
+                <span class="hint" id="new_sum_insured-hint">Current ₹5,00,000.00 · allowed ₹1,00,000.00 – ₹50,00,000.00 (MOTOR v1)</span>
+                <input type="text" inputmode="decimal" id="new_sum_insured" name="new_sum_insured" data-hint-id="new_sum_insured-hint" aria-describedby="new_sum_insured-hint" data-testid="input-new_sum_insured">
+              </div>
+              <div class="actions" style="margin-top:.6rem">
+                <div class="act">
+                  <button type="button" class="btn" id="preview-btn" data-testid="preview" data-api="POST /api/policies/{policy_number}/endorsements?preview=true">Preview premium change</button>
+                  <span class="api">POST /api/policies/MO-2026-000001/endorsements?preview=true</span>
+                </div>
+              </div>
+              <div class="preview" id="preview" hidden aria-live="polite" data-testid="preview-result"></div>
+            </div>
+
+            <div id="form-alert" style="margin-top:1rem"></div>
+            <div class="actions">
+              <div class="act">
+                <button type="submit" class="btn btn-primary" data-testid="submit-endorsement" data-api="POST /api/policies/{policy_number}/endorsements">Submit endorsement</button>
+                <span class="api">POST /api/policies/MO-2026-000001/endorsements</span>
+              </div>
+              <div class="act"><a class="btn" href="E5-S3.html#detail">Cancel</a></div>
+            </div>
+          </form>
+        </section>
+        <section class="panel" aria-labelledby="pol-h">
+          <h2 id="pol-h">Policy</h2>
+          <dl class="kv">
+            <dt>Status</dt><dd id="pol-status"><span class="badge b-ACTIVE">ACTIVE</span></dd>
+            <dt>Product</dt><dd>Motor · rule version v1</dd>
+            <dt>Sum insured</dt><dd class="num">₹5,00,000.00</dd>
+            <dt>Premium</dt><dd class="num">₹15,500.00</dd>
+            <dt>Term</dt><dd class="num">2026-03-01 – 2027-02-28</dd>
+            <dt>Address</dt><dd>1 Sample Street, Testville</dd>
+            <dt>Nominees</dt><dd>None</dd>
+          </dl>
+          <p class="small muted" style="margin-top:.8rem">Premium deltas are pro-rated for the unused part of the term and recorded on the endorsement; they are not collected now.</p>
+        </section>
+      </div>
+    </div>
+
+    <!-- After a successful submission the app navigates to Policy Detail -->
+    <div class="screen" data-screen="done" data-roles="CUSTOMER ADMIN" data-route="/policies">
+      <div class="alert alert-ok" role="status" data-testid="endorsement-confirmation" id="done-msg"></div>
+      <div class="page-head">
+        <div>
+          <h1>MO-2026-000001 <span class="badge b-ENDORSED" data-testid="status-badge">ENDORSED</span></h1>
+          <p class="route">Route: /policies/MO-2026-000001 · <span class="api-inline">GET /api/policies/MO-2026-000001</span></p>
+        </div>
+        <a class="btn" href="E5-S3.html#detail">Open full Policy Detail</a>
+      </div>
+      <section class="panel" aria-labelledby="eh-h">
+        <h2 id="eh-h">Endorsement history</h2>
+        <div class="table-wrap">
+          <table class="rtable" data-testid="endorsement-history">
+            <caption class="sr-only">Endorsements, oldest first</caption>
+            <thead><tr><th scope="col">Date</th><th scope="col">Type</th><th scope="col">Before</th><th scope="col">After</th><th scope="col">Premium delta</th></tr></thead>
+            <tbody id="done-rows"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel" aria-labelledby="lc-h">
+        <h2 id="lc-h">Lifecycle</h2>
+        <ol class="timeline" id="done-lifecycle">
+          <li>Issued &rarr; <span class="badge b-ACTIVE">ACTIVE</span><br><span class="small muted">2026-03-01 10:05 · reason <code>ISSUED</code></span></li>
+        </ol>
+      </section>
+      <button type="button" class="btn" id="again">Make another change</button>
+    </div>
+  </main>
+</div>
+<div id="live" class="sr-only" aria-live="polite"></div>
+<script>
+"use strict";
+/* ---------------- shared mockup shell (identical in every mockup) ---------------- */
+const PF = (() => {
+  const ACTORS = { CUSTOMER: "cust-001", UNDERWRITER: "uw-001", ADMIN: "admin-001" };
+  const NAV = {
+    CUSTOMER: [["Get a Quote", "E3-S3.html", "/quote"], ["My Policies", "E5-S3.html", "/policies"]],
+    UNDERWRITER: [["Workbench", "E4-S5.html#workbench", "/underwriter/queue"]],
+    ADMIN: [["Product Catalog", "E2-S4.html", "/admin/catalog"], ["Underwriting Review", "E4-S5.html#review", "/admin/underwriting"], ["Portfolio", "E9-S2.html", "/admin/portfolio"]]
+  };
+  const CAPTION = { CUSTOMER: "Customer", UNDERWRITER: "Underwriter", ADMIN: "Admin" };
+  const KEY = "policyforge.demoRole";
+  const sel = document.getElementById("role-switcher");
+  const nav = document.getElementById("sidenav");
+  const toggle = document.getElementById("nav-toggle");
+  let activeRoute = window.PF_ACTIVE_ROUTE || "";
+  let currentScreen = null;
+  /* Display-only formatting of decimal strings. The UI never does money arithmetic (NFR-01). */
+  const INR = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  function inr(s) { return INR.format(Number(s)); }
+  function signedInr(s) { return (String(s).startsWith("-") ? "−" : "+") + INR.format(Math.abs(Number(s))); }
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "3b1f6f0e-8a4c-4d8e-9a7b-0c2d4e6f8a10";
+  }
+  function role() { return sel.value; }
+  function headers() { return { "X-Actor-Id": ACTORS[role()], "X-Actor-Role": role(), "X-Correlation-ID": uuid() }; }
+  function badge(status, label) {
+    const s = document.createElement("span");
+    s.className = "badge b-" + status; s.textContent = label || status; s.setAttribute("data-testid", "status-badge");
+    return s;
+  }
+  function badgeHtml(status, label) { return '<span class="badge b-' + status + '" data-testid="status-badge">' + (label || status) + "</span>"; }
+  /* Records the request the real API client would send (no network). Never pass raw PII here. */
+  function log(method, path, body, status) {
+    const h = headers();
+    const txt = method + " " + path + (status ? "  → " + status : "") + "\n" +
+      "X-Actor-Id: " + h["X-Actor-Id"] + "  X-Actor-Role: " + h["X-Actor-Role"] + "  X-Correlation-ID: " + h["X-Correlation-ID"] +
+      (body ? "\nbody: " + JSON.stringify(body) : "");
+    document.getElementById("req-log").textContent = txt;
+    return h;
+  }
+  function announce(msg) { const l = document.getElementById("live"); l.textContent = ""; setTimeout(() => { l.textContent = msg; }, 30); }
+  function renderNav(r) {
+    const ul = document.getElementById("nav-list"); ul.innerHTML = "";
+    document.getElementById("nav-caption").textContent = CAPTION[r];
+    NAV[r].forEach(([label, href, route]) => {
+      const li = document.createElement("li"); const a = document.createElement("a");
+      a.href = href; a.textContent = label; a.dataset.route = route; a.setAttribute("data-testid", "nav-" + route.replace(/\W+/g, "-").replace(/^-|-$/g, ""));
+      if (route === activeRoute) a.setAttribute("aria-current", "page");
+      a.addEventListener("click", () => closeNav());
+      li.appendChild(a); ul.appendChild(li);
+    });
+  }
+  function allowed(el, r) { return !el.dataset.roles || el.dataset.roles.split(" ").includes(r); }
+  function applyScreens() {
+    const screens = Array.from(document.querySelectorAll(".screen"));
+    const r = role();
+    let cur = screens.find(s => s.dataset.screen === currentScreen && allowed(s, r)) || screens.find(s => allowed(s, r)) || null;
+    screens.forEach(s => { s.hidden = s !== cur; });
+    document.getElementById("not-authorised").hidden = !!cur || screens.length === 0;
+    currentScreen = cur ? cur.dataset.screen : currentScreen;
+    if (cur && cur.dataset.route) { activeRoute = cur.dataset.route; }
+    document.querySelectorAll("[data-goto-screen]").forEach(b => b.setAttribute("aria-pressed", String(!!cur && b.dataset.gotoScreen === cur.dataset.screen)));
+    renderNav(r);
+    document.dispatchEvent(new CustomEvent("pf:screen", { detail: currentScreen }));
+  }
+  function setRole(r) {
+    sel.value = r;
+    try { localStorage.setItem(KEY, r); } catch (e) { /* storage unavailable in file:// on some browsers */ }
+    document.getElementById("hdrs").textContent = "X-Actor-Id: " + ACTORS[r] + " · X-Actor-Role: " + r;
+    applyScreens();
+    document.dispatchEvent(new CustomEvent("pf:role", { detail: r }));
+  }
+  function gotoScreen(name) {
+    currentScreen = name;
+    const s = document.querySelector('.screen[data-screen="' + name + '"]');
+    if (s && !allowed(s, role())) { setRole(s.dataset.roles.split(" ")[0]); } else { applyScreens(); }
+  }
+  function setState(group, val) {
+    document.querySelectorAll("[data-when]").forEach(el => {
+      const conds = el.dataset.when.split(" ");
+      const mine = conds.filter(c => c.startsWith(group + ":"));
+      if (mine.length) el.hidden = !mine.includes(group + ":" + val);
+    });
+    document.querySelectorAll('[data-set-state^="' + group + ':"]').forEach(b => b.setAttribute("aria-pressed", String(b.dataset.setState === group + ":" + val)));
+    document.dispatchEvent(new CustomEvent("pf:state", { detail: { group, val } }));
+  }
+  function openNav() { nav.classList.add("open"); toggle.setAttribute("aria-expanded", "true"); const f = nav.querySelector("a"); if (f) f.focus(); }
+  function closeNav() { if (!nav.classList.contains("open")) return; nav.classList.remove("open"); toggle.setAttribute("aria-expanded", "false"); }
+  function fieldError(input, msg) {
+    const id = input.id + "-error";
+    let e = document.getElementById(id);
+    if (!msg) { input.removeAttribute("aria-invalid"); if (e) e.remove(); input.setAttribute("aria-describedby", (input.dataset.hintId || "")); return; }
+    if (!e) { e = document.createElement("p"); e.id = id; e.className = "err"; e.setAttribute("data-testid", "error-" + input.id); input.insertAdjacentElement("afterend", e); }
+    e.textContent = msg;
+    input.setAttribute("aria-invalid", "true");
+    input.setAttribute("aria-describedby", ((input.dataset.hintId || "") + " " + id).trim());
+  }
+  function init() {
+    toggle.addEventListener("click", () => nav.classList.contains("open") ? closeNav() : openNav());
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && nav.classList.contains("open")) { closeNav(); toggle.focus(); } });
+    sel.addEventListener("change", () => { setRole(sel.value); announce("Demo user switched to " + sel.options[sel.selectedIndex].text); });
+    document.querySelectorAll("[data-set-state]").forEach(b => b.addEventListener("click", () => { const [g, v] = b.dataset.setState.split(":"); setState(g, v); }));
+    document.querySelectorAll("[data-goto-screen]").forEach(b => b.addEventListener("click", () => gotoScreen(b.dataset.gotoScreen)));
+    window.addEventListener("hashchange", () => { const h = location.hash.replace("#", ""); if (h && document.querySelector('.screen[data-screen="' + h + '"]')) gotoScreen(h); });
+    const hash = location.hash.replace("#", "");
+    if (hash && document.querySelector('.screen[data-screen="' + hash + '"]')) currentScreen = hash;
+    let stored = null; try { stored = localStorage.getItem(KEY); } catch (e) { stored = null; }
+    let r = ACTORS[stored] ? stored : (window.PF_DEFAULT_ROLE || "CUSTOMER");
+    const want = currentScreen && document.querySelector('.screen[data-screen="' + currentScreen + '"]');
+    if (want && !allowed(want, r)) r = want.dataset.roles.split(" ")[0];
+    else if (!want && window.PF_DEFAULT_ROLE && !stored) r = window.PF_DEFAULT_ROLE;
+    setRole(r);
+    document.querySelectorAll("[data-set-state][data-default]").forEach(b => { const [g, v] = b.dataset.setState.split(":"); setState(g, v); });
+  }
+  return { inr, signedInr, uuid, role, headers, log, badge, badgeHtml, announce, setState, setRole, gotoScreen, fieldError, init, ACTORS };
+})();
+</script>
+<script>
+"use strict";
+/* ---------------- page script: E6-S3 ---------------- */
+window.PF_ACTIVE_ROUTE = "/policies";
+const $ = id => document.getElementById(id);
+const PN = "MO-2026-000001";
+const PATH = "/api/policies/" + PN + "/endorsements";
+const PREVIEWS = {
+  "600000.00": { type: "CHANGE_SUM_INSURED", after: { sum_insured: "600000.00" }, new_premium: "18600.00", premium_delta: "1537.26", unused_days: 181, term_days: 365 },
+  "400000.00": { type: "CHANGE_SUM_INSURED", after: { sum_insured: "400000.00" }, new_premium: "12400.00", premium_delta: "-1537.26", unused_days: 181, term_days: 365 }
+};
+let polState = "ENDORSABLE";
+let endorsementRows = [];
+let policyStatus = "ACTIVE";
+const FIELDS = ["address", "nominee_name", "share_percent", "new_sum_insured", "type"];
+function clearErrors() { FIELDS.forEach(f => PF.fieldError($(f), null)); $("form-alert").innerHTML = ""; }
+function showType() { const t = $("type").value; document.querySelectorAll("[data-type]").forEach(el => { el.hidden = el.dataset.type !== t; }); clearErrors(); }
+$("type").addEventListener("change", showType);
+function body() {
+  const t = $("type").value;
+  if (t === "CHANGE_ADDRESS") return { type: t, address: $("address").value.trim() };
+  if (t === "ADD_NOMINEE") return { type: t, nominee_name: $("nominee_name").value.trim(), relationship: $("relationship").value, share_percent: $("share_percent").value.trim() };
+  return { type: t, new_sum_insured: $("new_sum_insured").value.trim() };
+}
+function paise(s) { if (!/^\d+(\.\d{1,2})?$/.test(s)) return null; const [r, f = ""] = s.split("."); return BigInt(r) * 100n + BigInt((f + "00").slice(0, 2)); }
+/* Simulates the server's 422 details; the real validation is backend-only. */
+function serverErrors(b) {
+  const d = [];
+  if (b.type === "CHANGE_ADDRESS") { if (!b.address) d.push(["address", "REQUIRED", "Enter the new address"]); else if (b.address === "1 Sample Street, Testville") d.push(["address", "UNCHANGED", "This is already the policy address"]); }
+  if (b.type === "ADD_NOMINEE") {
+    if (!b.nominee_name) d.push(["nominee_name", "REQUIRED", "Enter the nominee's name"]);
+    const s = paise(b.share_percent);
+    if (s === null) d.push(["share_percent", "INVALID_FORMAT", "Enter a number between 1 and 100"]);
+    else if (s < 100n || s > 10000n) d.push(["share_percent", "OUT_OF_RANGE", "Share must be between 1 and 100"]);
+  }
+  if (b.type === "CHANGE_SUM_INSURED") {
+    const v = paise(b.new_sum_insured);
+    if (v === null) d.push(["new_sum_insured", b.new_sum_insured ? "INVALID_FORMAT" : "REQUIRED", "Enter an amount such as 600000.00"]);
+    else if (v < 10000000n || v > 500000000n) d.push(["new_sum_insured", "OUT_OF_RANGE", "Sum insured must be between ₹1,00,000.00 and ₹50,00,000.00"]);
+    else if (v === 50000000n) d.push(["new_sum_insured", "UNCHANGED", "This is already the sum insured"]);
+  }
+  return d;
+}
+function show422(d) {
+  d.forEach(([f, c, m]) => PF.fieldError($(f), c + " — " + m));
+  $("form-alert").innerHTML = '<div class="alert alert-error" role="alert"><p><strong class="code">422 VALIDATION_ERROR</strong> — nothing was saved.</p><ul>' + d.map(x => "<li><code>" + x[0] + "</code>: <code>" + x[1] + "</code></li>").join("") + "</ul></div>";
+  $(d[0][0]).focus();
+}
+function show409() {
+  $("form-alert").innerHTML = '<div class="alert alert-error" role="alert" data-testid="endorse-error"><p><strong class="code">409 INVALID_POLICY_STATE</strong> — this policy is <strong>CANCELLED</strong>, so it can no longer be endorsed. <code>details: {"current": "CANCELLED", "target": "ENDORSED"}</code></p></div>';
+}
+function norm(s) { const v = paise(s); if (v === null) return s; const r = v / 100n, f = v % 100n; return r + "." + String(f).padStart(2, "0"); }
+$("preview-btn").addEventListener("click", () => {
+  clearErrors(); const b = body(); const pv = $("preview");
+  if (polState === "CANCELLED") { PF.log("POST", PATH + "?preview=true", b, "409 INVALID_POLICY_STATE"); show409(); pv.hidden = true; return; }
+  const d = serverErrors(b);
+  if (d.length) { PF.log("POST", PATH + "?preview=true", b, "422 VALIDATION_ERROR"); show422(d); pv.hidden = true; return; }
+  const r = PREVIEWS[norm(b.new_sum_insured)];
+  PF.log("POST", PATH + "?preview=true", b, "200" + (r ? " " + JSON.stringify(r) : ""));
+  pv.innerHTML = r
+    ? '<p class="small muted" style="margin:0">Premium change if submitted today (2026-09-01)</p><p class="delta" data-testid="preview-delta">' + PF.signedInr(r.premium_delta) + "</p>" +
+      '<dl class="kv small"><dt>New annual premium</dt><dd class="num">' + PF.inr(r.new_premium) + "</dd><dt>Current premium</dt><dd class='num'>₹15,500.00</dd>" +
+      "<dt>Pro-rated for</dt><dd>" + r.unused_days + " unused of " + r.term_days + " days</dd></dl><p class='small muted' style='margin:.4rem 0 0'>Preview only — nothing has been saved.</p>"
+    : '<p class="small">Mockup: preview fixtures exist for 600000.00 and 400000.00 only; the backend computes every other value.</p>';
+  pv.hidden = false; PF.announce(r ? "Premium change " + PF.signedInr(r.premium_delta) : "Preview shown");
+});
+$("endorse-form").addEventListener("submit", e => {
+  e.preventDefault(); clearErrors(); const b = body();
+  if (polState === "CANCELLED") { PF.log("POST", PATH, b, "409 INVALID_POLICY_STATE"); show409(); return; }
+  const d = serverErrors(b);
+  if (d.length) { PF.log("POST", PATH, b, "422 VALIDATION_ERROR"); show422(d); return; }
+  const today = "2026-09-01 11:20";
+  let before, after, delta = "0.00";
+  if (b.type === "CHANGE_ADDRESS") { before = "1 Sample Street, Testville"; after = b.address; }
+  if (b.type === "ADD_NOMINEE") { before = "No nominees"; after = b.nominee_name + " (" + b.relationship + ", " + b.share_percent + "%)"; }
+  if (b.type === "CHANGE_SUM_INSURED") { const r = PREVIEWS[norm(b.new_sum_insured)]; before = "Sum insured ₹5,00,000.00"; after = "Sum insured " + PF.inr(b.new_sum_insured); delta = r ? r.premium_delta : "0.00"; }
+  const resp = { endorsement_id: "5b1e7c3a-2d9f-4e86-b4a0-8c6d2f1e9a37", type: b.type, premium_delta: delta, policy: { policy_number: PN, status: "ENDORSED" } };
+  PF.log("POST", PATH, b, "201 " + JSON.stringify(resp));
+  const from = policyStatus; policyStatus = "ENDORSED";
+  endorsementRows.push([today, b.type, before, after, delta, from]);
+  $("done-rows").innerHTML = endorsementRows.map(h => '<tr><td data-label="Date" class="num">' + h[0] + '</td><td data-label="Type"><code>' + h[1] + '</code></td><td data-label="Before">' + h[2] + '</td><td data-label="After">' + h[3] + '</td><td data-label="Premium delta" class="num">' + PF.signedInr(h[4]) + "</td></tr>").join("");
+  $("done-lifecycle").insertAdjacentHTML("beforeend", "<li>" + PF.badgeHtml(from) + " &rarr; " + PF.badgeHtml("ENDORSED") + '<br><span class="small muted">' + today + " · reason <code>ENDORSEMENT:" + b.type + "</code></span></li>");
+  $("done-msg").innerHTML = "<p>Endorsement <code>" + b.type + "</code> recorded for MO-2026-000001 · premium delta " + PF.signedInr(delta) + ".</p>";
+  $("pol-status").innerHTML = PF.badgeHtml("ENDORSED");
+  PF.gotoScreen("done"); $("main").focus(); PF.announce("Endorsement recorded. Policy status ENDORSED");
+});
+$("again").addEventListener("click", () => PF.gotoScreen("endorse"));
+document.addEventListener("pf:state", e => { if (e.detail.group === "pol") { polState = e.detail.val; clearErrors(); $("pol-status").innerHTML = PF.badgeHtml(polState === "CANCELLED" ? "CANCELLED" : policyStatus); } });
+$("ex-preview").addEventListener("click", () => { PF.gotoScreen("endorse"); $("type").value = "CHANGE_SUM_INSURED"; showType(); $("new_sum_insured").value = "600000.00"; $("preview-btn").click(); });
+$("ex-422").addEventListener("click", () => { PF.gotoScreen("endorse"); $("type").value = "CHANGE_SUM_INSURED"; showType(); $("new_sum_insured").value = "99999"; document.querySelector('[data-testid="submit-endorsement"]').click(); });
+$("ex-notallowed").addEventListener("click", () => {
+  PF.gotoScreen("endorse"); clearErrors();
+  PF.log("POST", "/api/policies/TL-2026-000099/endorsements", { type: "CHANGE_SUM_INSURED", new_sum_insured: "6000000.00" }, "422 VALIDATION_ERROR");
+  PF.fieldError($("type"), "NOT_ALLOWED — this type is not in the policy rule version's allowed_types");
+  $("form-alert").innerHTML = '<div class="alert alert-error" role="alert"><p><strong class="code">422 VALIDATION_ERROR</strong> — <code>type</code>: <code>NOT_ALLOWED</code>. Example for a policy whose rule version does not allow this type (normally prevented because the selector only lists allowed types).</p></div>';
+});
+PF.init();
+showType();
+</script>
+</body>
+</html>

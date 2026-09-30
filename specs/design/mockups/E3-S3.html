@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Get a Quote · PolicyForge mockup E3-S3</title>
+<!--
+  PolicyForge UI mockup E3-S3 · Get a Quote
+  Self-contained: all CSS/JS inline, no external requests, no real API calls (fixtures only).
+  Field names follow the "API endpoints" table + request/response notes in docs/conventions.md and the
+  owning feature spec (specs/design/api-contracts.md did not exist when this mockup was written).
+  Every interactive element carries data-api="<METHOD> <path>" and a visible caption.
+  The dashed "Mockup" bar at the top of <main> is NOT part of the product: it toggles happy/empty/error states.
+  Responsive: breakpoint 768px. Below it the side nav collapses behind the "Open navigation" button and
+  tables (.rtable) render as stacked cards.
+  Story E3-S3 (AC-01, AC-12, AC-13, AC-22, AC-24). Route: /quote (CUSTOMER).
+  POST /api/quotes  body {product, inputs}  -> 201 {quote_id, product, rule_version, premium, currency}
+     inputs per product (docs/conventions.md "Quote input fields"):
+       all: sum_insured (money string)
+       TERM_LIFE: age (int), term_years (int 5-30), smoker (bool)
+       MOTOR: owner_age (int), vehicle_age_years (int >= 0), engine_cc (int > 0), zone ("A"|"B"), ncb_percent ("0"|"20"|"25"|"35"|"45"|"50")
+       HOUSEHOLD: proposer_age (int), construction_type (CONCRETE|BRICK|TIMBER|THATCH), in_flood_zone (bool), has_security_system (bool)
+  GET  /api/quotes/{quote_id} -> 200 stored inputs + rule_version + premium (used when returning to a quote)
+  Errors: 422 VALIDATION_ERROR details [{field: "sum_insured", code: "OUT_OF_RANGE"}]; 409 NO_PUBLISHED_VERSION.
+  Fixture premiums (computed from E2-S1 v1 values; the mockup does no pricing):
+     MOTOR golden {owner_age 30, sum_insured "500000.00", vehicle_age_years 3, engine_cc 1200, zone A, ncb_percent "20"} -> "14322.00"
+     TERM_LIFE {age 35, sum_insured "5000000.00", term_years 20, smoker false} -> "9900.00"
+     HOUSEHOLD {proposer_age 40, sum_insured "3000000.00", BRICK, in_flood_zone true, has_security_system true} -> "2700.00"
+  Client-side the mockup only simulates the server's 422 for sum_insured / age bounds (v1 eligibility).
+-->
+<style>
+:root{
+  --bg:#f5f6f8;--surface:#ffffff;--surface-2:#f0f2f5;--border:#d5dae1;--border-strong:#aeb6c1;
+  --text:#1b2330;--muted:#4f5967;--accent:#1d4f8f;--accent-hover:#163e71;--accent-soft:#e7eef8;
+  --danger:#9b1c1c;--danger-soft:#fbeaea;--ok:#1d5b34;--ok-soft:#e5f3ea;--warn:#734700;--warn-soft:#fff3dc;
+  --violet:#4a2d86;--violet-soft:#efeaf9;--focus:#1d4f8f;
+  --font:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono","SFMono-Regular",Consolas,monospace;
+  --radius:6px;--nav-w:232px;--header-h:56px;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{font-size:15px;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.45;overflow-x:hidden}
+h1{font-size:1.45rem;margin:0 0 .25rem;font-weight:650;letter-spacing:-.01em}
+h2{font-size:1.1rem;margin:0 0 .75rem;font-weight:650}
+h3{font-size:.98rem;margin:0 0 .5rem;font-weight:650}
+p{margin:0 0 .75rem}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;overflow-wrap:anywhere}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:3px}
+.skip{position:absolute;left:-9999px;top:0;background:var(--surface);padding:.5rem 1rem;z-index:50}
+.skip:focus{left:.5rem;top:.5rem}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ---------- header ---------- */
+.topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
+  min-height:var(--header-h);padding:.5rem 1rem;background:#1f2733;color:#f4f6f9;border-bottom:1px solid #111821}
+.brand{font-weight:700;letter-spacing:.01em;font-size:1.05rem;color:#fff;text-decoration:none;margin-right:auto}
+.brand small{font-weight:400;color:#c4ccd7;margin-left:.4rem;font-size:.8rem}
+.menu-btn{display:none;align-items:center;gap:.4rem;background:transparent;color:#fff;border:1px solid #6b7686;
+  border-radius:var(--radius);padding:.4rem .6rem;font:inherit;cursor:pointer}
+.menu-btn:focus-visible,.role select:focus-visible{outline-color:#9cc2ff}
+.role{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.role label{font-size:.82rem;color:#d8dee7}
+.role select{font:inherit;padding:.35rem .5rem;border-radius:var(--radius);border:1px solid #6b7686;background:#fff;color:var(--text)}
+.hdrs{font-family:var(--mono);font-size:.75rem;color:#d8dee7;background:#2c3645;border-radius:4px;padding:.2rem .45rem}
+
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:var(--nav-w) minmax(0,1fr);min-height:calc(100vh - var(--header-h))}
+.sidenav{background:var(--surface);border-right:1px solid var(--border);padding:1rem .75rem}
+.sidenav ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.15rem}
+.sidenav a{display:block;padding:.55rem .7rem;border-radius:var(--radius);color:var(--text);text-decoration:none}
+.sidenav a:hover{background:var(--surface-2)}
+.sidenav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent);font-weight:650;box-shadow:inset 3px 0 0 var(--accent)}
+.nav-caption{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 .5rem .7rem}
+main{padding:1.25rem 1.5rem 3rem;min-width:0}
+main:focus{outline:none}
+
+/* ---------- mockup bar (not product UI) ---------- */
+.mock-bar{border:1px dashed var(--border-strong);background:#fbfbfc;border-radius:var(--radius);padding:.5rem .7rem;margin-bottom:1.1rem;
+  display:flex;flex-wrap:wrap;gap:.4rem .6rem;align-items:center;font-size:.82rem;color:var(--muted)}
+.mock-tag{font-family:var(--mono);font-weight:700;color:var(--text)}
+.mock-bar .grp{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}
+.mock-bar button{font:inherit;font-size:.78rem;padding:.2rem .5rem;border:1px solid var(--border-strong);background:#fff;border-radius:4px;cursor:pointer;color:var(--text)}
+.mock-bar button[aria-pressed="true"]{background:#1f2733;color:#fff;border-color:#1f2733}
+.req-log{flex-basis:100%;font-family:var(--mono);font-size:.74rem;color:var(--muted);overflow-wrap:anywhere;white-space:pre-wrap;margin:0}
+
+/* ---------- building blocks ---------- */
+.page-head{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:flex-end;justify-content:space-between;margin-bottom:1rem}
+.route{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;margin-bottom:1rem;min-width:0}
+.panel > h2:first-child,.panel > h3:first-child{margin-top:0}
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.75rem}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.8rem .9rem}
+.stat .lbl{font-size:.8rem;color:var(--muted);margin:0}
+.stat .val{font-size:1.4rem;font-weight:650;margin:.1rem 0 0;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:.84rem}
+.row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.stack>*+*{margin-top:.75rem}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:.35rem 1rem;margin:0}
+.kv dt{color:var(--muted);font-size:.86rem}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.api{display:block;font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-top:.25rem;overflow-wrap:anywhere}
+.api::before{content:"\21B3  "}
+.api-inline{font-family:var(--mono);font-size:.72rem;color:var(--muted);overflow-wrap:anywhere}
+
+/* ---------- forms ---------- */
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.9rem 1rem}
+.form-grid .full{grid-column:1/-1}
+.field{display:flex;flex-direction:column;gap:.25rem;min-width:0}
+.field label,.field legend,.lbl-strong{font-weight:600;font-size:.9rem}
+.field .hint{font-size:.78rem;color:var(--muted)}
+.field .fname{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+input[type=text],input[type=date],input[type=number],input[type=password],select,textarea{
+  font:inherit;padding:.5rem .6rem;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff;color:var(--text);width:100%;min-width:0}
+textarea{min-height:5rem;resize:vertical}
+textarea.code{font-family:var(--mono);font-size:.8rem;min-height:14rem}
+input[aria-invalid="true"],select[aria-invalid="true"],textarea[aria-invalid="true"]{border:2px solid var(--danger)}
+.err{color:var(--danger);font-size:.84rem;font-weight:600}
+.err::before{content:"Error: "}
+fieldset{border:1px solid var(--border);border-radius:var(--radius);padding:.6rem .8rem;margin:0;min-width:0}
+fieldset legend{padding:0 .3rem}
+.choice{display:flex;align-items:center;gap:.45rem;padding:.2rem 0}
+.choice input{width:1.05rem;height:1.05rem;margin:0}
+.seg{display:flex;flex-wrap:wrap;gap:.4rem}
+.seg label{display:flex;align-items:center;gap:.4rem;border:1px solid var(--border-strong);border-radius:var(--radius);padding:.45rem .7rem;cursor:pointer;background:#fff}
+.seg input:checked + span{font-weight:650}
+.seg label:has(input:checked){border:2px solid var(--accent);background:var(--accent-soft)}
+
+/* ---------- buttons ---------- */
+.btn{font:inherit;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:.5rem .95rem;border-radius:var(--radius);
+  border:1px solid var(--border-strong);background:#fff;color:var(--text);cursor:pointer;text-decoration:none;min-height:2.4rem}
+.btn:hover{background:var(--surface-2)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn-danger:hover{background:#7e1616}
+.btn-sm{padding:.25rem .6rem;min-height:2rem;font-size:.86rem}
+.btn[disabled],.btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
+.actions{display:flex;flex-wrap:wrap;gap:.6rem;align-items:flex-start;margin-top:1rem}
+.act{display:flex;flex-direction:column}
+
+/* ---------- alerts ---------- */
+.alert{border:1px solid;border-left-width:5px;border-radius:var(--radius);padding:.7rem .9rem;margin-bottom:1rem}
+.alert p:last-child,.alert ul:last-child{margin-bottom:0}
+.alert strong.code{font-family:var(--mono)}
+.alert-error{background:var(--danger-soft);border-color:var(--danger);color:#5f1111}
+.alert-ok{background:var(--ok-soft);border-color:var(--ok);color:#123d22}
+.alert-info{background:var(--accent-soft);border-color:var(--accent);color:#12335e}
+.alert-warn{background:var(--warn-soft);border-color:var(--warn);color:#4d3000}
+.empty{border:1px dashed var(--border-strong);border-radius:var(--radius);padding:1.2rem;text-align:center;color:var(--muted);background:#fbfbfc}
+.loading{display:flex;gap:.5rem;align-items:center;color:var(--muted)}
+.spinner{width:1rem;height:1rem;border:2px solid var(--border-strong);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation:none}}
+
+/* ---------- status badges (text, never colour alone) ---------- */
+.badge{display:inline-flex;align-items:center;gap:.3rem;font-family:var(--mono);font-size:.74rem;font-weight:700;letter-spacing:.03em;
+  padding:.12rem .45rem;border-radius:4px;border:1px solid;white-space:nowrap;background:var(--surface-2);color:var(--text);border-color:var(--border-strong)}
+.badge::before{content:"";width:.45rem;height:.45rem;border-radius:50%;background:currentColor;flex:none}
+.b-ACTIVE,.b-AUTO_BIND,.b-PUBLISHED,.b-PAID,.b-ISSUED{background:var(--ok-soft);color:var(--ok);border-color:#8fc4a1}
+.b-ENDORSED,.b-SUBMITTED,.b-UNDERWRITING{background:var(--accent-soft);color:var(--accent);border-color:#98b5dc}
+.b-LAPSED,.b-MANUAL_REVIEW,.b-UNPAID,.b-IN_GRACE{background:var(--warn-soft);color:var(--warn);border-color:#d9b36a}
+.b-CANCELLED,.b-DECLINE,.b-DECLINED{background:var(--danger-soft);color:var(--danger);border-color:#dc9c9c}
+.b-RENEWED{background:var(--violet-soft);color:var(--violet);border-color:#b7a6dc}
+.b-DRAFT{background:#fff;color:var(--muted);border-style:dashed}
+.b-DRAFT::before{background:transparent;border:1.5px solid currentColor}
+.b-Active{background:#1f2733;color:#fff;border-color:#1f2733}
+.b-CANCELLED::before,.b-DECLINE::before,.b-DECLINED::before{border-radius:1px}
+.b-LAPSED::before,.b-MANUAL_REVIEW::before,.b-UNPAID::before{border-radius:0;transform:rotate(45deg)}
+
+/* ---------- responsive tables → stacked cards ---------- */
+.rtable{width:100%;border-collapse:collapse;background:var(--surface);font-size:.92rem}
+.rtable caption{text-align:left;font-weight:650;padding:0 0 .5rem}
+.rtable th,.rtable td{padding:.55rem .65rem;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+.rtable thead th{background:var(--surface-2);font-size:.8rem;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.04em}
+.rtable tbody tr.selectable{cursor:pointer}
+.rtable tbody tr.selectable:hover,.rtable tbody tr[aria-selected="true"]{background:#f6f9fd}
+.table-wrap{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.table-wrap .rtable tr:last-child td{border-bottom:0}
+
+/* ---------- dialog ---------- */
+dialog{border:1px solid var(--border);border-radius:8px;padding:0;width:min(540px,calc(100vw - 24px));max-height:calc(100vh - 24px);color:var(--text)}
+dialog::backdrop{background:rgba(20,26,36,.55)}
+dialog .dlg-body{padding:1.1rem 1.2rem}
+dialog .dlg-foot{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:flex-end;padding:.8rem 1.2rem;border-top:1px solid var(--border);background:var(--surface-2)}
+
+.timeline{list-style:none;margin:0;padding:0 0 0 .9rem;border-left:2px solid var(--border)}
+.timeline li{position:relative;padding:0 0 .8rem .6rem}
+.timeline li::before{content:"";position:absolute;left:-1.28rem;top:.35rem;width:.6rem;height:.6rem;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+
+/* ---------- breakpoint: 768px ---------- */
+@media (max-width:767.98px){
+  .menu-btn{display:inline-flex}
+  .hdrs{display:none}
+  .brand small{display:none}
+  .layout{display:block}
+  .sidenav{display:none;position:absolute;left:0;right:0;z-index:25;border-right:0;border-bottom:1px solid var(--border);box-shadow:0 8px 20px rgba(0,0,0,.12)}
+  .sidenav.open{display:block}
+  main{padding:1rem .9rem 3rem}
+  .grid-2,.form-grid{grid-template-columns:minmax(0,1fr)}
+  .kv{grid-template-columns:minmax(0,1fr)}
+  .kv dd{margin-bottom:.35rem}
+  .table-wrap{border:0;overflow:visible}
+  .rtable,.rtable tbody,.rtable tr,.rtable td{display:block;width:100%}
+  .rtable thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  .rtable tr{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.65rem;padding:.35rem .2rem}
+  .rtable td{border:0;display:grid;grid-template-columns:minmax(6.5rem,40%) minmax(0,1fr);gap:.5rem;padding:.35rem .6rem}
+  .rtable td::before{content:attr(data-label);font-size:.78rem;color:var(--muted);font-weight:600}
+  .rtable td.cell-actions{grid-template-columns:minmax(0,1fr)}
+  .rtable td.cell-actions::before{display:none}
+  .rtable .num{white-space:normal}
+  .btn{min-height:2.75rem}
+}
+.result-premium{font-size:2rem;font-weight:700;font-variant-numeric:tabular-nums;margin:.2rem 0}
+.quote-layout{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:1rem;align-items:start}
+@media (max-width:767.98px){.quote-layout{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body data-story="E3-S3">
+<a class="skip" href="#main">Skip to main content</a>
+<header class="topbar">
+  <button type="button" class="menu-btn" id="nav-toggle" aria-label="Open navigation" aria-controls="sidenav" aria-expanded="false" data-testid="nav-toggle">
+    <span aria-hidden="true">&#9776;</span><span aria-hidden="true">Menu</span>
+  </button>
+  <a class="brand" href="index.html">PolicyForge <small>Horizon Insurance</small></a>
+  <div class="role">
+    <label for="role-switcher">Demo user</label>
+    <select id="role-switcher" data-testid="role-switcher">
+      <option value="CUSTOMER">Customer (cust-001)</option>
+      <option value="UNDERWRITER">Underwriter (uw-001)</option>
+      <option value="ADMIN">Admin (admin-001)</option>
+    </select>
+    <code class="hdrs" id="hdrs" title="Auth-stub headers sent by the API client"></code>
+  </div>
+</header>
+<div class="layout">
+  <nav id="sidenav" class="sidenav" aria-label="Main navigation" data-testid="side-nav">
+    <p class="nav-caption" id="nav-caption">Customer</p>
+    <ul id="nav-list"></ul>
+  </nav>
+  <main id="main" tabindex="-1">
+    <section class="mock-bar" aria-label="Mockup state controls (not part of the product)">
+      <span class="mock-tag">MOCKUP E3-S3</span>
+      <a href="index.html">All mockups</a>
+      <span class="grp" role="group" aria-label="Quote examples">Examples:
+  <button type="button" id="ex-golden">Golden MOTOR input</button>
+  <button type="button" id="ex-422">422: sum insured 50000</button>
+  <button type="button" id="ex-409">409 NO_PUBLISHED_VERSION (HOUSEHOLD)</button>
+</span>
+      <p class="req-log" id="req-log" aria-live="polite">No request sent yet.</p>
+    </section>
+    <section id="not-authorised" class="panel" hidden data-testid="not-authorised">
+      <h1>Not authorised</h1>
+      <p>The selected demo user's role cannot open this screen. Switch the demo user in the header.</p>
+      <p class="api">API would answer 403 FORBIDDEN · {"error": {"code": "FORBIDDEN", "message": "Role not allowed on the route", "details": null}}</p>
+    </section>
+    <div class="screen" data-screen="quote" data-roles="CUSTOMER" data-route="/quote">
+      <div class="page-head">
+        <div>
+          <h1>Get a Quote</h1>
+          <p class="route">Route: /quote</p>
+        </div>
+      </div>
+      <div class="quote-layout">
+        <section class="panel" aria-labelledby="form-h">
+          <h2 id="form-h">Risk details</h2>
+          <form id="quote-form" novalidate>
+            <fieldset class="field" style="margin-bottom:1rem">
+              <legend>Product</legend>
+              <div class="seg" id="product-seg">
+                <label><input type="radio" name="product" value="TERM_LIFE" data-testid="product-TERM_LIFE"><span>Term Life</span></label>
+                <label><input type="radio" name="product" value="MOTOR" checked data-testid="product-MOTOR"><span>Motor</span></label>
+                <label><input type="radio" name="product" value="HOUSEHOLD" data-testid="product-HOUSEHOLD"><span>Household</span></label>
+              </div>
+            </fieldset>
+
+            <div class="form-grid">
+              <div class="field full">
+                <label for="sum_insured">Sum insured</label>
+                <span class="hint" id="sum_insured-hint">Rupees, two decimals. <span id="si-range">Motor v1: 1,00,000.00 – 50,00,000.00</span></span>
+                <input type="text" inputmode="decimal" id="sum_insured" name="sum_insured" value="500000.00" data-hint-id="sum_insured-hint" aria-describedby="sum_insured-hint" data-testid="input-sum_insured">
+              </div>
+
+              <!-- MOTOR -->
+              <div class="field" data-product="MOTOR">
+                <label for="owner_age">Owner age</label>
+                <input type="number" id="owner_age" name="owner_age" value="30" min="18" max="75" data-testid="input-owner_age">
+              </div>
+              <div class="field" data-product="MOTOR">
+                <label for="vehicle_age_years">Vehicle age (years)</label>
+                <input type="number" id="vehicle_age_years" name="vehicle_age_years" value="3" min="0" data-testid="input-vehicle_age_years">
+              </div>
+              <div class="field" data-product="MOTOR">
+                <label for="engine_cc">Engine cc</label>
+                <input type="number" id="engine_cc" name="engine_cc" value="1200" min="1" data-testid="input-engine_cc">
+              </div>
+              <div class="field" data-product="MOTOR">
+                <label for="zone">Zone</label>
+                <select id="zone" name="zone" data-testid="input-zone"><option value="A" selected>A</option><option value="B">B</option></select>
+              </div>
+              <div class="field" data-product="MOTOR">
+                <label for="ncb_percent">NCB %</label>
+                <select id="ncb_percent" name="ncb_percent" data-testid="input-ncb_percent">
+                  <option value="0">0</option><option value="20" selected>20</option><option value="25">25</option>
+                  <option value="35">35</option><option value="45">45</option><option value="50">50</option>
+                </select>
+              </div>
+
+              <!-- TERM_LIFE -->
+              <div class="field" data-product="TERM_LIFE" hidden>
+                <label for="age">Age</label>
+                <input type="number" id="age" name="age" value="35" min="18" max="60" data-testid="input-age">
+              </div>
+              <div class="field" data-product="TERM_LIFE" hidden>
+                <label for="term_years">Term (years)</label>
+                <input type="number" id="term_years" name="term_years" value="20" min="5" max="30" data-testid="input-term_years">
+              </div>
+              <div class="field full" data-product="TERM_LIFE" hidden>
+                <label class="choice"><input type="checkbox" id="smoker" name="smoker" data-testid="input-smoker"> Smoker</label>
+              </div>
+
+              <!-- HOUSEHOLD -->
+              <div class="field" data-product="HOUSEHOLD" hidden>
+                <label for="proposer_age">Proposer age</label>
+                <input type="number" id="proposer_age" name="proposer_age" value="40" min="18" max="80" data-testid="input-proposer_age">
+              </div>
+              <div class="field" data-product="HOUSEHOLD" hidden>
+                <label for="construction_type">Construction type</label>
+                <select id="construction_type" name="construction_type" data-testid="input-construction_type">
+                  <option value="CONCRETE">Concrete</option><option value="BRICK" selected>Brick</option>
+                  <option value="TIMBER">Timber</option><option value="THATCH">Thatch</option>
+                </select>
+              </div>
+              <div class="field" data-product="HOUSEHOLD" hidden>
+                <label class="choice"><input type="checkbox" id="in_flood_zone" name="in_flood_zone" checked data-testid="input-in_flood_zone"> In flood zone</label>
+              </div>
+              <div class="field" data-product="HOUSEHOLD" hidden>
+                <label class="choice"><input type="checkbox" id="has_security_system" name="has_security_system" checked data-testid="input-has_security_system"> Has security system</label>
+              </div>
+            </div>
+            <div id="form-alert" style="margin-top:1rem"></div>
+            <div class="actions">
+              <div class="act">
+                <button type="submit" class="btn btn-primary" data-testid="get-quote" data-api="POST /api/quotes">Get quote</button>
+                <span class="api">POST /api/quotes</span>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel" aria-labelledby="result-h" aria-live="polite">
+          <h2 id="result-h">Your quote</h2>
+          <div id="result-empty" class="empty" data-testid="quote-empty">No quote yet. Fill in the risk details and choose "Get quote".</div>
+          <div id="result" hidden data-testid="quote-result">
+            <p class="muted small" style="margin:0"><span id="r-product">Motor</span> · annual premium</p>
+            <p class="result-premium" id="r-premium" data-testid="quote-premium">₹14,322.00</p>
+            <dl class="kv">
+              <dt>Rule version</dt><dd id="r-version" data-testid="quote-rule-version">Rule version v1</dd>
+              <dt>Currency</dt><dd id="r-currency">INR</dd>
+              <dt>Quote id</dt><dd><code id="r-quote-id">7c9e6679-7425-40de-944b-e07fc1f90ae7</code></dd>
+            </dl>
+            <p class="small muted" id="r-note" style="margin-top:.6rem" hidden>Mockup: fixed sample response — the real premium is computed by the backend.</p>
+            <div class="actions">
+              <div class="act">
+                <a class="btn btn-primary" id="apply-link" href="E4-S5.html#apply" data-testid="apply" data-api="GET /api/quotes/{quote_id}">Apply</a>
+                <span class="api">opens /apply/:quoteId · GET /api/quotes/{quote_id}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+<div id="live" class="sr-only" aria-live="polite"></div>
+<script>
+"use strict";
+/* ---------------- shared mockup shell (identical in every mockup) ---------------- */
+const PF = (() => {
+  const ACTORS = { CUSTOMER: "cust-001", UNDERWRITER: "uw-001", ADMIN: "admin-001" };
+  const NAV = {
+    CUSTOMER: [["Get a Quote", "E3-S3.html", "/quote"], ["My Policies", "E5-S3.html", "/policies"]],
+    UNDERWRITER: [["Workbench", "E4-S5.html#workbench", "/underwriter/queue"]],
+    ADMIN: [["Product Catalog", "E2-S4.html", "/admin/catalog"], ["Underwriting Review", "E4-S5.html#review", "/admin/underwriting"], ["Portfolio", "E9-S2.html", "/admin/portfolio"]]
+  };
+  const CAPTION = { CUSTOMER: "Customer", UNDERWRITER: "Underwriter", ADMIN: "Admin" };
+  const KEY = "policyforge.demoRole";
+  const sel = document.getElementById("role-switcher");
+  const nav = document.getElementById("sidenav");
+  const toggle = document.getElementById("nav-toggle");
+  let activeRoute = window.PF_ACTIVE_ROUTE || "";
+  let currentScreen = null;
+  /* Display-only formatting of decimal strings. The UI never does money arithmetic (NFR-01). */
+  const INR = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  function inr(s) { return INR.format(Number(s)); }
+  function signedInr(s) { return (String(s).startsWith("-") ? "−" : "+") + INR.format(Math.abs(Number(s))); }
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "3b1f6f0e-8a4c-4d8e-9a7b-0c2d4e6f8a10";
+  }
+  function role() { return sel.value; }
+  function headers() { return { "X-Actor-Id": ACTORS[role()], "X-Actor-Role": role(), "X-Correlation-ID": uuid() }; }
+  function badge(status, label) {
+    const s = document.createElement("span");
+    s.className = "badge b-" + status; s.textContent = label || status; s.setAttribute("data-testid", "status-badge");
+    return s;
+  }
+  function badgeHtml(status, label) { return '<span class="badge b-' + status + '" data-testid="status-badge">' + (label || status) + "</span>"; }
+  /* Records the request the real API client would send (no network). Never pass raw PII here. */
+  function log(method, path, body, status) {
+    const h = headers();
+    const txt = method + " " + path + (status ? "  → " + status : "") + "\n" +
+      "X-Actor-Id: " + h["X-Actor-Id"] + "  X-Actor-Role: " + h["X-Actor-Role"] + "  X-Correlation-ID: " + h["X-Correlation-ID"] +
+      (body ? "\nbody: " + JSON.stringify(body) : "");
+    document.getElementById("req-log").textContent = txt;
+    return h;
+  }
+  function announce(msg) { const l = document.getElementById("live"); l.textContent = ""; setTimeout(() => { l.textContent = msg; }, 30); }
+  function renderNav(r) {
+    const ul = document.getElementById("nav-list"); ul.innerHTML = "";
+    document.getElementById("nav-caption").textContent = CAPTION[r];
+    NAV[r].forEach(([label, href, route]) => {
+      const li = document.createElement("li"); const a = document.createElement("a");
+      a.href = href; a.textContent = label; a.dataset.route = route; a.setAttribute("data-testid", "nav-" + route.replace(/\W+/g, "-").replace(/^-|-$/g, ""));
+      if (route === activeRoute) a.setAttribute("aria-current", "page");
+      a.addEventListener("click", () => closeNav());
+      li.appendChild(a); ul.appendChild(li);
+    });
+  }
+  function allowed(el, r) { return !el.dataset.roles || el.dataset.roles.split(" ").includes(r); }
+  function applyScreens() {
+    const screens = Array.from(document.querySelectorAll(".screen"));
+    const r = role();
+    let cur = screens.find(s => s.dataset.screen === currentScreen && allowed(s, r)) || screens.find(s => allowed(s, r)) || null;
+    screens.forEach(s => { s.hidden = s !== cur; });
+    document.getElementById("not-authorised").hidden = !!cur || screens.length === 0;
+    currentScreen = cur ? cur.dataset.screen : currentScreen;
+    if (cur && cur.dataset.route) { activeRoute = cur.dataset.route; }
+    document.querySelectorAll("[data-goto-screen]").forEach(b => b.setAttribute("aria-pressed", String(!!cur && b.dataset.gotoScreen === cur.dataset.screen)));
+    renderNav(r);
+    document.dispatchEvent(new CustomEvent("pf:screen", { detail: currentScreen }));
+  }
+  function setRole(r) {
+    sel.value = r;
+    try { localStorage.setItem(KEY, r); } catch (e) { /* storage unavailable in file:// on some browsers */ }
+    document.getElementById("hdrs").textContent = "X-Actor-Id: " + ACTORS[r] + " · X-Actor-Role: " + r;
+    applyScreens();
+    document.dispatchEvent(new CustomEvent("pf:role", { detail: r }));
+  }
+  function gotoScreen(name) {
+    currentScreen = name;
+    const s = document.querySelector('.screen[data-screen="' + name + '"]');
+    if (s && !allowed(s, role())) { setRole(s.dataset.roles.split(" ")[0]); } else { applyScreens(); }
+  }
+  function setState(group, val) {
+    document.querySelectorAll("[data-when]").forEach(el => {
+      const conds = el.dataset.when.split(" ");
+      const mine = conds.filter(c => c.startsWith(group + ":"));
+      if (mine.length) el.hidden = !mine.includes(group + ":" + val);
+    });
+    document.querySelectorAll('[data-set-state^="' + group + ':"]').forEach(b => b.setAttribute("aria-pressed", String(b.dataset.setState === group + ":" + val)));
+    document.dispatchEvent(new CustomEvent("pf:state", { detail: { group, val } }));
+  }
+  function openNav() { nav.classList.add("open"); toggle.setAttribute("aria-expanded", "true"); const f = nav.querySelector("a"); if (f) f.focus(); }
+  function closeNav() { if (!nav.classList.contains("open")) return; nav.classList.remove("open"); toggle.setAttribute("aria-expanded", "false"); }
+  function fieldError(input, msg) {
+    const id = input.id + "-error";
+    let e = document.getElementById(id);
+    if (!msg) { input.removeAttribute("aria-invalid"); if (e) e.remove(); input.setAttribute("aria-describedby", (input.dataset.hintId || "")); return; }
+    if (!e) { e = document.createElement("p"); e.id = id; e.className = "err"; e.setAttribute("data-testid", "error-" + input.id); input.insertAdjacentElement("afterend", e); }
+    e.textContent = msg;
+    input.setAttribute("aria-invalid", "true");
+    input.setAttribute("aria-describedby", ((input.dataset.hintId || "") + " " + id).trim());
+  }
+  function init() {
+    toggle.addEventListener("click", () => nav.classList.contains("open") ? closeNav() : openNav());
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && nav.classList.contains("open")) { closeNav(); toggle.focus(); } });
+    sel.addEventListener("change", () => { setRole(sel.value); announce("Demo user switched to " + sel.options[sel.selectedIndex].text); });
+    document.querySelectorAll("[data-set-state]").forEach(b => b.addEventListener("click", () => { const [g, v] = b.dataset.setState.split(":"); setState(g, v); }));
+    document.querySelectorAll("[data-goto-screen]").forEach(b => b.addEventListener("click", () => gotoScreen(b.dataset.gotoScreen)));
+    window.addEventListener("hashchange", () => { const h = location.hash.replace("#", ""); if (h && document.querySelector('.screen[data-screen="' + h + '"]')) gotoScreen(h); });
+    const hash = location.hash.replace("#", "");
+    if (hash && document.querySelector('.screen[data-screen="' + hash + '"]')) currentScreen = hash;
+    let stored = null; try { stored = localStorage.getItem(KEY); } catch (e) { stored = null; }
+    let r = ACTORS[stored] ? stored : (window.PF_DEFAULT_ROLE || "CUSTOMER");
+    const want = currentScreen && document.querySelector('.screen[data-screen="' + currentScreen + '"]');
+    if (want && !allowed(want, r)) r = want.dataset.roles.split(" ")[0];
+    else if (!want && window.PF_DEFAULT_ROLE && !stored) r = window.PF_DEFAULT_ROLE;
+    setRole(r);
+    document.querySelectorAll("[data-set-state][data-default]").forEach(b => { const [g, v] = b.dataset.setState.split(":"); setState(g, v); });
+  }
+  return { inr, signedInr, uuid, role, headers, log, badge, badgeHtml, announce, setState, setRole, gotoScreen, fieldError, init, ACTORS };
+})();
+</script>
+<script>
+"use strict";
+/* ---------------- page script: E3-S3 ---------------- */
+window.PF_ACTIVE_ROUTE = "/quote";
+window.PF_DEFAULT_ROLE = "CUSTOMER";
+const BOUNDS = { /* v1 eligibility from the active rule version (display + simulated 422 only) */
+  TERM_LIFE: { age: "age", min: 18, max: 60, si: ["500000.00", "50000000.00"], label: "Term Life v1: 5,00,000.00 – 5,00,00,000.00" },
+  MOTOR: { age: "owner_age", min: 18, max: 75, si: ["100000.00", "5000000.00"], label: "Motor v1: 1,00,000.00 – 50,00,000.00" },
+  HOUSEHOLD: { age: "proposer_age", min: 18, max: 80, si: ["500000.00", "20000000.00"], label: "Household v1: 5,00,000.00 – 2,00,00,000.00" }
+};
+const FIXTURES = {
+  MOTOR: { match: { owner_age: 30, sum_insured: "500000.00", vehicle_age_years: 3, engine_cc: 1200, zone: "A", ncb_percent: "20" },
+    response: { quote_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7", product: "MOTOR", rule_version: 1, premium: "14322.00", currency: "INR" } },
+  TERM_LIFE: { match: { age: 35, sum_insured: "5000000.00", term_years: 20, smoker: false },
+    response: { quote_id: "1b4e28ba-2fa1-41d2-883f-0016d3cca427", product: "TERM_LIFE", rule_version: 1, premium: "9900.00", currency: "INR" } },
+  HOUSEHOLD: { match: { proposer_age: 40, sum_insured: "3000000.00", construction_type: "BRICK", in_flood_zone: true, has_security_system: true },
+    response: { quote_id: "6fa459ea-ee8a-4ca4-894e-db77e160355e", product: "HOUSEHOLD", rule_version: 1, premium: "2700.00", currency: "INR" } }
+};
+const NAMES = { TERM_LIFE: "Term Life", MOTOR: "Motor", HOUSEHOLD: "Household" };
+let noPublished = false;
+function product() { return document.querySelector('input[name="product"]:checked').value; }
+function showProduct() {
+  const p = product();
+  document.querySelectorAll("[data-product]").forEach(el => { el.hidden = el.dataset.product !== p; });
+  document.getElementById("si-range").textContent = BOUNDS[p].label;
+}
+function inputs() {
+  const p = product(); const v = id => document.getElementById(id);
+  const out = { sum_insured: v("sum_insured").value.trim() };
+  if (p === "MOTOR") Object.assign(out, { owner_age: +v("owner_age").value, vehicle_age_years: +v("vehicle_age_years").value, engine_cc: +v("engine_cc").value, zone: v("zone").value, ncb_percent: v("ncb_percent").value });
+  if (p === "TERM_LIFE") Object.assign(out, { age: +v("age").value, term_years: +v("term_years").value, smoker: v("smoker").checked });
+  if (p === "HOUSEHOLD") Object.assign(out, { proposer_age: +v("proposer_age").value, construction_type: v("construction_type").value, in_flood_zone: v("in_flood_zone").checked, has_security_system: v("has_security_system").checked });
+  return out;
+}
+/* Simulates the backend's 422 response shape; bounds compared as decimals via fixed-point integer paise. */
+function paise(s) { if (!/^\d+(\.\d{1,2})?$/.test(s)) return null; const [r, f = ""] = s.split("."); return BigInt(r) * 100n + BigInt((f + "00").slice(0, 2)); }
+function simulateServer(p, inp) {
+  const details = []; const b = BOUNDS[p];
+  const si = paise(inp.sum_insured);
+  if (si === null) details.push({ field: "sum_insured", code: "INVALID_FORMAT" });
+  else if (si < paise(b.si[0]) || si > paise(b.si[1])) details.push({ field: "sum_insured", code: "OUT_OF_RANGE" });
+  const age = inp[b.age]; if (!(age >= b.min && age <= b.max)) details.push({ field: b.age, code: "OUT_OF_RANGE" });
+  if (p === "TERM_LIFE" && !(inp.term_years >= 5 && inp.term_years <= 30)) details.push({ field: "term_years", code: "OUT_OF_RANGE" });
+  return details;
+}
+const MSG = { OUT_OF_RANGE: "Value is outside the allowed range for the active rule version", INVALID_FORMAT: "Enter an amount such as 500000.00", REQUIRED: "Required" };
+function clearErrors() { document.querySelectorAll("#quote-form input, #quote-form select").forEach(i => { if (i.id) PF.fieldError(i, null); }); document.getElementById("form-alert").innerHTML = ""; }
+document.querySelectorAll('input[name="product"]').forEach(r => r.addEventListener("change", () => { clearErrors(); showProduct(); }));
+document.getElementById("quote-form").addEventListener("submit", e => {
+  e.preventDefault(); clearErrors();
+  const p = product(); const inp = inputs(); const body = { product: p, inputs: inp };
+  const details = simulateServer(p, inp);
+  const resEmpty = document.getElementById("result-empty"); const res = document.getElementById("result");
+  if (details.length) {
+    PF.log("POST", "/api/quotes", body, "422 VALIDATION_ERROR");
+    details.forEach(d => PF.fieldError(document.getElementById(d.field), d.code + " — " + (MSG[d.code] || d.code)));
+    document.getElementById("form-alert").innerHTML = '<div class="alert alert-error" role="alert"><p><strong class="code">422 VALIDATION_ERROR</strong> — please correct the highlighted field' + (details.length > 1 ? "s" : "") + ".</p></div>";
+    res.hidden = true; resEmpty.hidden = false;
+    document.getElementById(details[0].field).focus();
+    return;
+  }
+  if (noPublished && p === "HOUSEHOLD") {
+    PF.log("POST", "/api/quotes", body, "409 NO_PUBLISHED_VERSION");
+    document.getElementById("form-alert").innerHTML = '<div class="alert alert-error" role="alert" data-testid="quote-error"><p><strong class="code">409 NO_PUBLISHED_VERSION</strong> — Household has no published rule version, so it cannot be quoted right now. No quote was stored.</p></div>';
+    res.hidden = true; resEmpty.hidden = false; return;
+  }
+  const fx = FIXTURES[p]; const r = fx.response;
+  const exact = Object.keys(fx.match).every(k => fx.match[k] === inp[k]);
+  PF.log("POST", "/api/quotes", body, "201 " + JSON.stringify(r));
+  document.getElementById("r-product").textContent = NAMES[r.product];
+  document.getElementById("r-premium").textContent = PF.inr(r.premium);
+  document.getElementById("r-version").textContent = "Rule version v" + r.rule_version;
+  document.getElementById("r-currency").textContent = r.currency;
+  document.getElementById("r-quote-id").textContent = r.quote_id;
+  document.getElementById("r-note").hidden = exact;
+  document.getElementById("apply-link").href = "E4-S5.html#apply";
+  document.getElementById("apply-link").setAttribute("aria-label", "Apply for quote " + r.quote_id.slice(0, 8));
+  resEmpty.hidden = true; res.hidden = false;
+  PF.announce("Premium " + PF.inr(r.premium) + ", rule version v" + r.rule_version);
+});
+function setVals(p, vals) {
+  document.querySelector('input[name="product"][value="' + p + '"]').checked = true; showProduct();
+  Object.entries(vals).forEach(([k, v]) => { const el = document.getElementById(k); if (el.type === "checkbox") el.checked = v; else el.value = String(v); });
+}
+document.getElementById("ex-golden").addEventListener("click", () => { noPublished = false; setVals("MOTOR", FIXTURES.MOTOR.match); document.querySelector('[data-testid="get-quote"]').click(); });
+document.getElementById("ex-422").addEventListener("click", () => { noPublished = false; setVals("MOTOR", Object.assign({}, FIXTURES.MOTOR.match, { sum_insured: "50000.00" })); document.querySelector('[data-testid="get-quote"]').click(); });
+document.getElementById("ex-409").addEventListener("click", () => { noPublished = true; setVals("HOUSEHOLD", FIXTURES.HOUSEHOLD.match); document.querySelector('[data-testid="get-quote"]').click(); });
+PF.init();
+showProduct();
+</script>
+</body>
+</html>

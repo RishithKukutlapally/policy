@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cancel policy with refund preview · PolicyForge mockup E8-S3</title>
+<!--
+  PolicyForge UI mockup E8-S3 · Cancel policy with refund preview
+  Self-contained: all CSS/JS inline, no external requests, no real API calls (fixtures only).
+  Field names follow the "API endpoints" table + request/response notes in docs/conventions.md and the
+  owning feature spec (specs/design/api-contracts.md did not exist when this mockup was written).
+  Every interactive element carries data-api="<METHOD> <path>" and a visible caption.
+  The dashed "Mockup" bar at the top of <main> is NOT part of the product: it toggles happy/empty/error states.
+  Responsive: breakpoint 768px. Below it the side nav collapses behind the "Open navigation" button and
+  tables (.rtable) render as stacked cards.
+  Story E8-S3 (AC-08, AC-19, AC-10, AC-22, AC-24). Route: /policies/TL-2026-000001/cancel (CUSTOMER owner, ADMIN).
+  Policy TL-2026-000001: TERM_LIFE, premium 12000.00 paid at issuance, term 2026-01-01 – 2026-12-31 (365 days), new business (free look 15 days).
+  GET  /api/policies/{policy_number}/cancellation-preview?date=YYYY-MM-DD
+       -> 200 {refund_type, premium_paid, term_days, days_elapsed, unused_days, admin_fee, amount} (nothing persisted)
+  POST /api/policies/{policy_number}/cancel {cancellation_date, reason} -> 200 {status: "CANCELLED", refund: {refund_type, amount, ...}}
+  Fixtures: 2026-01-10 -> FREE_LOOK, amount "12000.00", admin_fee "0.00", days_elapsed 9, unused_days 356
+            2026-04-01 -> PRO_RATA,  amount "8791.10",  admin_fee "250.00", days_elapsed 90, unused_days 275 (12000.00 x 275/365 = 9041.10; - 250.00)
+  Errors: 422 VALIDATION_ERROR details [{field: "cancellation_date", code: "OUTSIDE_TERM"}]; 409 INVALID_POLICY_STATE (already CANCELLED).
+  ASSUMED (schema gaps):
+    - pro_rata_amount ("9041.10"): the story's display text "₹9,041.10 pro-rata for 275 unused days" needs the pre-fee amount,
+      which is not in the listed preview fields; the UI must not compute it (NFR-01). Proposed as an extra preview/refund field.
+    - reason enum: NO_LONGER_NEEDED (from AC-08), FOUND_OTHER_COVER, AFFORDABILITY, OTHER.
+-->
+<style>
+:root{
+  --bg:#f5f6f8;--surface:#ffffff;--surface-2:#f0f2f5;--border:#d5dae1;--border-strong:#aeb6c1;
+  --text:#1b2330;--muted:#4f5967;--accent:#1d4f8f;--accent-hover:#163e71;--accent-soft:#e7eef8;
+  --danger:#9b1c1c;--danger-soft:#fbeaea;--ok:#1d5b34;--ok-soft:#e5f3ea;--warn:#734700;--warn-soft:#fff3dc;
+  --violet:#4a2d86;--violet-soft:#efeaf9;--focus:#1d4f8f;
+  --font:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono","SFMono-Regular",Consolas,monospace;
+  --radius:6px;--nav-w:232px;--header-h:56px;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{font-size:15px;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.45;overflow-x:hidden}
+h1{font-size:1.45rem;margin:0 0 .25rem;font-weight:650;letter-spacing:-.01em}
+h2{font-size:1.1rem;margin:0 0 .75rem;font-weight:650}
+h3{font-size:.98rem;margin:0 0 .5rem;font-weight:650}
+p{margin:0 0 .75rem}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;overflow-wrap:anywhere}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:3px}
+.skip{position:absolute;left:-9999px;top:0;background:var(--surface);padding:.5rem 1rem;z-index:50}
+.skip:focus{left:.5rem;top:.5rem}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ---------- header ---------- */
+.topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
+  min-height:var(--header-h);padding:.5rem 1rem;background:#1f2733;color:#f4f6f9;border-bottom:1px solid #111821}
+.brand{font-weight:700;letter-spacing:.01em;font-size:1.05rem;color:#fff;text-decoration:none;margin-right:auto}
+.brand small{font-weight:400;color:#c4ccd7;margin-left:.4rem;font-size:.8rem}
+.menu-btn{display:none;align-items:center;gap:.4rem;background:transparent;color:#fff;border:1px solid #6b7686;
+  border-radius:var(--radius);padding:.4rem .6rem;font:inherit;cursor:pointer}
+.menu-btn:focus-visible,.role select:focus-visible{outline-color:#9cc2ff}
+.role{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.role label{font-size:.82rem;color:#d8dee7}
+.role select{font:inherit;padding:.35rem .5rem;border-radius:var(--radius);border:1px solid #6b7686;background:#fff;color:var(--text)}
+.hdrs{font-family:var(--mono);font-size:.75rem;color:#d8dee7;background:#2c3645;border-radius:4px;padding:.2rem .45rem}
+
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:var(--nav-w) minmax(0,1fr);min-height:calc(100vh - var(--header-h))}
+.sidenav{background:var(--surface);border-right:1px solid var(--border);padding:1rem .75rem}
+.sidenav ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.15rem}
+.sidenav a{display:block;padding:.55rem .7rem;border-radius:var(--radius);color:var(--text);text-decoration:none}
+.sidenav a:hover{background:var(--surface-2)}
+.sidenav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent);font-weight:650;box-shadow:inset 3px 0 0 var(--accent)}
+.nav-caption{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 .5rem .7rem}
+main{padding:1.25rem 1.5rem 3rem;min-width:0}
+main:focus{outline:none}
+
+/* ---------- mockup bar (not product UI) ---------- */
+.mock-bar{border:1px dashed var(--border-strong);background:#fbfbfc;border-radius:var(--radius);padding:.5rem .7rem;margin-bottom:1.1rem;
+  display:flex;flex-wrap:wrap;gap:.4rem .6rem;align-items:center;font-size:.82rem;color:var(--muted)}
+.mock-tag{font-family:var(--mono);font-weight:700;color:var(--text)}
+.mock-bar .grp{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}
+.mock-bar button{font:inherit;font-size:.78rem;padding:.2rem .5rem;border:1px solid var(--border-strong);background:#fff;border-radius:4px;cursor:pointer;color:var(--text)}
+.mock-bar button[aria-pressed="true"]{background:#1f2733;color:#fff;border-color:#1f2733}
+.req-log{flex-basis:100%;font-family:var(--mono);font-size:.74rem;color:var(--muted);overflow-wrap:anywhere;white-space:pre-wrap;margin:0}
+
+/* ---------- building blocks ---------- */
+.page-head{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:flex-end;justify-content:space-between;margin-bottom:1rem}
+.route{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;margin-bottom:1rem;min-width:0}
+.panel > h2:first-child,.panel > h3:first-child{margin-top:0}
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.75rem}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.8rem .9rem}
+.stat .lbl{font-size:.8rem;color:var(--muted);margin:0}
+.stat .val{font-size:1.4rem;font-weight:650;margin:.1rem 0 0;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:.84rem}
+.row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.stack>*+*{margin-top:.75rem}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:.35rem 1rem;margin:0}
+.kv dt{color:var(--muted);font-size:.86rem}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.api{display:block;font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-top:.25rem;overflow-wrap:anywhere}
+.api::before{content:"\21B3  "}
+.api-inline{font-family:var(--mono);font-size:.72rem;color:var(--muted);overflow-wrap:anywhere}
+
+/* ---------- forms ---------- */
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.9rem 1rem}
+.form-grid .full{grid-column:1/-1}
+.field{display:flex;flex-direction:column;gap:.25rem;min-width:0}
+.field label,.field legend,.lbl-strong{font-weight:600;font-size:.9rem}
+.field .hint{font-size:.78rem;color:var(--muted)}
+.field .fname{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+input[type=text],input[type=date],input[type=number],input[type=password],select,textarea{
+  font:inherit;padding:.5rem .6rem;border:1px solid var(--border-strong);border-radius:var(--radius);background:#fff;color:var(--text);width:100%;min-width:0}
+textarea{min-height:5rem;resize:vertical}
+textarea.code{font-family:var(--mono);font-size:.8rem;min-height:14rem}
+input[aria-invalid="true"],select[aria-invalid="true"],textarea[aria-invalid="true"]{border:2px solid var(--danger)}
+.err{color:var(--danger);font-size:.84rem;font-weight:600}
+.err::before{content:"Error: "}
+fieldset{border:1px solid var(--border);border-radius:var(--radius);padding:.6rem .8rem;margin:0;min-width:0}
+fieldset legend{padding:0 .3rem}
+.choice{display:flex;align-items:center;gap:.45rem;padding:.2rem 0}
+.choice input{width:1.05rem;height:1.05rem;margin:0}
+.seg{display:flex;flex-wrap:wrap;gap:.4rem}
+.seg label{display:flex;align-items:center;gap:.4rem;border:1px solid var(--border-strong);border-radius:var(--radius);padding:.45rem .7rem;cursor:pointer;background:#fff}
+.seg input:checked + span{font-weight:650}
+.seg label:has(input:checked){border:2px solid var(--accent);background:var(--accent-soft)}
+
+/* ---------- buttons ---------- */
+.btn{font:inherit;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:.5rem .95rem;border-radius:var(--radius);
+  border:1px solid var(--border-strong);background:#fff;color:var(--text);cursor:pointer;text-decoration:none;min-height:2.4rem}
+.btn:hover{background:var(--surface-2)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn-danger:hover{background:#7e1616}
+.btn-sm{padding:.25rem .6rem;min-height:2rem;font-size:.86rem}
+.btn[disabled],.btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
+.actions{display:flex;flex-wrap:wrap;gap:.6rem;align-items:flex-start;margin-top:1rem}
+.act{display:flex;flex-direction:column}
+
+/* ---------- alerts ---------- */
+.alert{border:1px solid;border-left-width:5px;border-radius:var(--radius);padding:.7rem .9rem;margin-bottom:1rem}
+.alert p:last-child,.alert ul:last-child{margin-bottom:0}
+.alert strong.code{font-family:var(--mono)}
+.alert-error{background:var(--danger-soft);border-color:var(--danger);color:#5f1111}
+.alert-ok{background:var(--ok-soft);border-color:var(--ok);color:#123d22}
+.alert-info{background:var(--accent-soft);border-color:var(--accent);color:#12335e}
+.alert-warn{background:var(--warn-soft);border-color:var(--warn);color:#4d3000}
+.empty{border:1px dashed var(--border-strong);border-radius:var(--radius);padding:1.2rem;text-align:center;color:var(--muted);background:#fbfbfc}
+.loading{display:flex;gap:.5rem;align-items:center;color:var(--muted)}
+.spinner{width:1rem;height:1rem;border:2px solid var(--border-strong);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation:none}}
+
+/* ---------- status badges (text, never colour alone) ---------- */
+.badge{display:inline-flex;align-items:center;gap:.3rem;font-family:var(--mono);font-size:.74rem;font-weight:700;letter-spacing:.03em;
+  padding:.12rem .45rem;border-radius:4px;border:1px solid;white-space:nowrap;background:var(--surface-2);color:var(--text);border-color:var(--border-strong)}
+.badge::before{content:"";width:.45rem;height:.45rem;border-radius:50%;background:currentColor;flex:none}
+.b-ACTIVE,.b-AUTO_BIND,.b-PUBLISHED,.b-PAID,.b-ISSUED{background:var(--ok-soft);color:var(--ok);border-color:#8fc4a1}
+.b-ENDORSED,.b-SUBMITTED,.b-UNDERWRITING{background:var(--accent-soft);color:var(--accent);border-color:#98b5dc}
+.b-LAPSED,.b-MANUAL_REVIEW,.b-UNPAID,.b-IN_GRACE{background:var(--warn-soft);color:var(--warn);border-color:#d9b36a}
+.b-CANCELLED,.b-DECLINE,.b-DECLINED{background:var(--danger-soft);color:var(--danger);border-color:#dc9c9c}
+.b-RENEWED{background:var(--violet-soft);color:var(--violet);border-color:#b7a6dc}
+.b-DRAFT{background:#fff;color:var(--muted);border-style:dashed}
+.b-DRAFT::before{background:transparent;border:1.5px solid currentColor}
+.b-Active{background:#1f2733;color:#fff;border-color:#1f2733}
+.b-CANCELLED::before,.b-DECLINE::before,.b-DECLINED::before{border-radius:1px}
+.b-LAPSED::before,.b-MANUAL_REVIEW::before,.b-UNPAID::before{border-radius:0;transform:rotate(45deg)}
+
+/* ---------- responsive tables → stacked cards ---------- */
+.rtable{width:100%;border-collapse:collapse;background:var(--surface);font-size:.92rem}
+.rtable caption{text-align:left;font-weight:650;padding:0 0 .5rem}
+.rtable th,.rtable td{padding:.55rem .65rem;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+.rtable thead th{background:var(--surface-2);font-size:.8rem;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.04em}
+.rtable tbody tr.selectable{cursor:pointer}
+.rtable tbody tr.selectable:hover,.rtable tbody tr[aria-selected="true"]{background:#f6f9fd}
+.table-wrap{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.table-wrap .rtable tr:last-child td{border-bottom:0}
+
+/* ---------- dialog ---------- */
+dialog{border:1px solid var(--border);border-radius:8px;padding:0;width:min(540px,calc(100vw - 24px));max-height:calc(100vh - 24px);color:var(--text)}
+dialog::backdrop{background:rgba(20,26,36,.55)}
+dialog .dlg-body{padding:1.1rem 1.2rem}
+dialog .dlg-foot{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:flex-end;padding:.8rem 1.2rem;border-top:1px solid var(--border);background:var(--surface-2)}
+
+.timeline{list-style:none;margin:0;padding:0 0 0 .9rem;border-left:2px solid var(--border)}
+.timeline li{position:relative;padding:0 0 .8rem .6rem}
+.timeline li::before{content:"";position:absolute;left:-1.28rem;top:.35rem;width:.6rem;height:.6rem;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+
+/* ---------- breakpoint: 768px ---------- */
+@media (max-width:767.98px){
+  .menu-btn{display:inline-flex}
+  .hdrs{display:none}
+  .brand small{display:none}
+  .layout{display:block}
+  .sidenav{display:none;position:absolute;left:0;right:0;z-index:25;border-right:0;border-bottom:1px solid var(--border);box-shadow:0 8px 20px rgba(0,0,0,.12)}
+  .sidenav.open{display:block}
+  main{padding:1rem .9rem 3rem}
+  .grid-2,.form-grid{grid-template-columns:minmax(0,1fr)}
+  .kv{grid-template-columns:minmax(0,1fr)}
+  .kv dd{margin-bottom:.35rem}
+  .table-wrap{border:0;overflow:visible}
+  .rtable,.rtable tbody,.rtable tr,.rtable td{display:block;width:100%}
+  .rtable thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  .rtable tr{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.65rem;padding:.35rem .2rem}
+  .rtable td{border:0;display:grid;grid-template-columns:minmax(6.5rem,40%) minmax(0,1fr);gap:.5rem;padding:.35rem .6rem}
+  .rtable td::before{content:attr(data-label);font-size:.78rem;color:var(--muted);font-weight:600}
+  .rtable td.cell-actions{grid-template-columns:minmax(0,1fr)}
+  .rtable td.cell-actions::before{display:none}
+  .rtable .num{white-space:normal}
+  .btn{min-height:2.75rem}
+}
+.refund-line{font-size:1.35rem;font-weight:700;font-variant-numeric:tabular-nums;margin:.2rem 0 .6rem}
+</style>
+</head>
+<body data-story="E8-S3">
+<a class="skip" href="#main">Skip to main content</a>
+<header class="topbar">
+  <button type="button" class="menu-btn" id="nav-toggle" aria-label="Open navigation" aria-controls="sidenav" aria-expanded="false" data-testid="nav-toggle">
+    <span aria-hidden="true">&#9776;</span><span aria-hidden="true">Menu</span>
+  </button>
+  <a class="brand" href="index.html">PolicyForge <small>Horizon Insurance</small></a>
+  <div class="role">
+    <label for="role-switcher">Demo user</label>
+    <select id="role-switcher" data-testid="role-switcher">
+      <option value="CUSTOMER">Customer (cust-001)</option>
+      <option value="UNDERWRITER">Underwriter (uw-001)</option>
+      <option value="ADMIN">Admin (admin-001)</option>
+    </select>
+    <code class="hdrs" id="hdrs" title="Auth-stub headers sent by the API client"></code>
+  </div>
+</header>
+<div class="layout">
+  <nav id="sidenav" class="sidenav" aria-label="Main navigation" data-testid="side-nav">
+    <p class="nav-caption" id="nav-caption">Customer</p>
+    <ul id="nav-list"></ul>
+  </nav>
+  <main id="main" tabindex="-1">
+    <section class="mock-bar" aria-label="Mockup state controls (not part of the product)">
+      <span class="mock-tag">MOCKUP E8-S3</span>
+      <a href="index.html">All mockups</a>
+      <span class="grp" role="group" aria-label="Policy state">Policy:
+  <button type="button" data-set-state="pol:ACTIVE" data-default aria-pressed="true">ACTIVE</button>
+  <button type="button" data-set-state="pol:CANCELLED" aria-pressed="false">Already CANCELLED (409)</button>
+</span>
+<span class="grp" role="group" aria-label="Examples">Dates:
+  <button type="button" data-date="2026-01-10">2026-01-10 free look</button>
+  <button type="button" data-date="2026-04-01">2026-04-01 pro-rata</button>
+  <button type="button" data-date="2027-01-01">2027-01-01 (422 OUTSIDE_TERM)</button>
+</span>
+      <p class="req-log" id="req-log" aria-live="polite">No request sent yet.</p>
+    </section>
+    <section id="not-authorised" class="panel" hidden data-testid="not-authorised">
+      <h1>Not authorised</h1>
+      <p>The selected demo user's role cannot open this screen. Switch the demo user in the header.</p>
+      <p class="api">API would answer 403 FORBIDDEN · {"error": {"code": "FORBIDDEN", "message": "Role not allowed on the route", "details": null}}</p>
+    </section>
+    <div class="screen" data-screen="cancel" data-roles="CUSTOMER ADMIN" data-route="/policies">
+      <p><a href="E5-S3.html#detail">&larr; Back to Policy Detail</a></p>
+      <div class="page-head">
+        <div>
+          <h1>Cancel TL-2026-000001 <span id="pol-badge"><span class="badge b-ACTIVE" data-testid="status-badge">ACTIVE</span></span></h1>
+          <p class="route">Route: /policies/TL-2026-000001/cancel</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <section class="panel" aria-labelledby="c-h">
+          <h2 id="c-h">Cancellation</h2>
+          <form id="cancel-form" novalidate>
+            <div class="form-grid">
+              <div class="field">
+                <label for="cancellation_date">Cancellation date</label>
+                <span class="hint" id="cancellation_date-hint">Within the policy term 2026-01-01 – 2026-12-31</span>
+                <input type="date" id="cancellation_date" name="cancellation_date" value="2026-04-01" data-hint-id="cancellation_date-hint" aria-describedby="cancellation_date-hint" data-testid="cancellation-date" data-api="GET /api/policies/{policy_number}/cancellation-preview?date=">
+              </div>
+              <div class="field">
+                <label for="reason">Reason</label>
+                <select id="reason" name="reason" data-testid="cancellation-reason">
+                  <option value="NO_LONGER_NEEDED">No longer needed</option>
+                  <option value="FOUND_OTHER_COVER">Found other cover</option>
+                  <option value="AFFORDABILITY">Affordability</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+            </div>
+            <span class="api">Preview refreshes on date change · GET /api/policies/TL-2026-000001/cancellation-preview?date=<span id="api-date">2026-04-01</span></span>
+            <div class="panel" style="margin:1rem 0 0;background:var(--surface-2)" aria-live="polite" aria-labelledby="pv-h">
+              <h3 id="pv-h">Refund preview</h3>
+              <div id="pv-loading" class="loading" hidden><span class="spinner" aria-hidden="true"></span> Updating preview…</div>
+              <div id="pv" data-testid="refund-preview"></div>
+            </div>
+            <div id="form-alert" style="margin-top:1rem"></div>
+            <div class="actions">
+              <div class="act">
+                <button type="submit" class="btn btn-danger" id="confirm-btn" data-testid="confirm-cancellation" data-api="POST /api/policies/{policy_number}/cancel">Confirm cancellation</button>
+                <span class="api">opens a confirmation dialog · POST /api/policies/TL-2026-000001/cancel</span>
+              </div>
+              <div class="act"><a class="btn" href="E5-S3.html#detail">Keep my policy</a></div>
+            </div>
+          </form>
+        </section>
+        <section class="panel" aria-labelledby="p-h">
+          <h2 id="p-h">Policy</h2>
+          <dl class="kv">
+            <dt>Product</dt><dd>Term Life · rule version v1</dd>
+            <dt>Sum insured</dt><dd class="num">₹50,00,000.00</dd>
+            <dt>Premium paid</dt><dd class="num">₹12,000.00</dd>
+            <dt>Term</dt><dd class="num">2026-01-01 – 2026-12-31</dd>
+            <dt>Free look</dt><dd>15 days from 2026-01-01 (new business)</dd>
+            <dt>Admin fee</dt><dd class="num">₹250.00 on pro-rata refunds</dd>
+          </dl>
+        </section>
+      </div>
+
+      <dialog id="confirm-dlg" aria-labelledby="dlg-h" data-testid="confirm-dialog">
+        <form method="dialog">
+          <div class="dlg-body">
+            <h2 id="dlg-h">Cancel TL-2026-000001?</h2>
+            <p>Cancellation date <strong id="dlg-date">2026-04-01</strong>. <span id="dlg-refund"></span></p>
+            <p class="small">This cannot be undone. Your cover ends on the cancellation date.</p>
+            <p class="api">POST /api/policies/TL-2026-000001/cancel</p>
+          </div>
+          <div class="dlg-foot">
+            <button type="submit" value="no" class="btn" data-testid="dialog-keep">Keep policy</button>
+            <button type="submit" value="yes" class="btn btn-danger" data-testid="dialog-confirm" data-api="POST /api/policies/{policy_number}/cancel">Yes, cancel policy</button>
+          </div>
+        </form>
+      </dialog>
+    </div>
+
+    <!-- After confirming, the app navigates to Policy Detail -->
+    <div class="screen" data-screen="done" data-roles="CUSTOMER ADMIN" data-route="/policies">
+      <div class="alert alert-ok" role="status" id="done-msg" data-testid="cancel-confirmation"></div>
+      <div class="page-head">
+        <div>
+          <h1>TL-2026-000001 <span class="badge b-CANCELLED" data-testid="status-badge">CANCELLED</span></h1>
+          <p class="route">Route: /policies/TL-2026-000001 · <span class="api-inline">GET /api/policies/TL-2026-000001</span></p>
+        </div>
+        <a class="btn" href="E5-S3.html">My Policies</a>
+      </div>
+      <section class="panel" aria-labelledby="rf-h">
+        <h2 id="rf-h">Refunds</h2>
+        <div class="table-wrap">
+          <table class="rtable" data-testid="refunds">
+            <caption class="sr-only">Refunds</caption>
+            <thead><tr><th scope="col">Cancellation date</th><th scope="col">Type</th><th scope="col">Unused days</th><th scope="col">Admin fee</th><th scope="col">Amount</th></tr></thead>
+            <tbody id="refund-rows"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel" aria-labelledby="lc-h">
+        <h2 id="lc-h">Lifecycle</h2>
+        <ol class="timeline" id="done-lifecycle"></ol>
+      </section>
+    </div>
+  </main>
+</div>
+<div id="live" class="sr-only" aria-live="polite"></div>
+<script>
+"use strict";
+/* ---------------- shared mockup shell (identical in every mockup) ---------------- */
+const PF = (() => {
+  const ACTORS = { CUSTOMER: "cust-001", UNDERWRITER: "uw-001", ADMIN: "admin-001" };
+  const NAV = {
+    CUSTOMER: [["Get a Quote", "E3-S3.html", "/quote"], ["My Policies", "E5-S3.html", "/policies"]],
+    UNDERWRITER: [["Workbench", "E4-S5.html#workbench", "/underwriter/queue"]],
+    ADMIN: [["Product Catalog", "E2-S4.html", "/admin/catalog"], ["Underwriting Review", "E4-S5.html#review", "/admin/underwriting"], ["Portfolio", "E9-S2.html", "/admin/portfolio"]]
+  };
+  const CAPTION = { CUSTOMER: "Customer", UNDERWRITER: "Underwriter", ADMIN: "Admin" };
+  const KEY = "policyforge.demoRole";
+  const sel = document.getElementById("role-switcher");
+  const nav = document.getElementById("sidenav");
+  const toggle = document.getElementById("nav-toggle");
+  let activeRoute = window.PF_ACTIVE_ROUTE || "";
+  let currentScreen = null;
+  /* Display-only formatting of decimal strings. The UI never does money arithmetic (NFR-01). */
+  const INR = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  function inr(s) { return INR.format(Number(s)); }
+  function signedInr(s) { return (String(s).startsWith("-") ? "−" : "+") + INR.format(Math.abs(Number(s))); }
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "3b1f6f0e-8a4c-4d8e-9a7b-0c2d4e6f8a10";
+  }
+  function role() { return sel.value; }
+  function headers() { return { "X-Actor-Id": ACTORS[role()], "X-Actor-Role": role(), "X-Correlation-ID": uuid() }; }
+  function badge(status, label) {
+    const s = document.createElement("span");
+    s.className = "badge b-" + status; s.textContent = label || status; s.setAttribute("data-testid", "status-badge");
+    return s;
+  }
+  function badgeHtml(status, label) { return '<span class="badge b-' + status + '" data-testid="status-badge">' + (label || status) + "</span>"; }
+  /* Records the request the real API client would send (no network). Never pass raw PII here. */
+  function log(method, path, body, status) {
+    const h = headers();
+    const txt = method + " " + path + (status ? "  → " + status : "") + "\n" +
+      "X-Actor-Id: " + h["X-Actor-Id"] + "  X-Actor-Role: " + h["X-Actor-Role"] + "  X-Correlation-ID: " + h["X-Correlation-ID"] +
+      (body ? "\nbody: " + JSON.stringify(body) : "");
+    document.getElementById("req-log").textContent = txt;
+    return h;
+  }
+  function announce(msg) { const l = document.getElementById("live"); l.textContent = ""; setTimeout(() => { l.textContent = msg; }, 30); }
+  function renderNav(r) {
+    const ul = document.getElementById("nav-list"); ul.innerHTML = "";
+    document.getElementById("nav-caption").textContent = CAPTION[r];
+    NAV[r].forEach(([label, href, route]) => {
+      const li = document.createElement("li"); const a = document.createElement("a");
+      a.href = href; a.textContent = label; a.dataset.route = route; a.setAttribute("data-testid", "nav-" + route.replace(/\W+/g, "-").replace(/^-|-$/g, ""));
+      if (route === activeRoute) a.setAttribute("aria-current", "page");
+      a.addEventListener("click", () => closeNav());
+      li.appendChild(a); ul.appendChild(li);
+    });
+  }
+  function allowed(el, r) { return !el.dataset.roles || el.dataset.roles.split(" ").includes(r); }
+  function applyScreens() {
+    const screens = Array.from(document.querySelectorAll(".screen"));
+    const r = role();
+    let cur = screens.find(s => s.dataset.screen === currentScreen && allowed(s, r)) || screens.find(s => allowed(s, r)) || null;
+    screens.forEach(s => { s.hidden = s !== cur; });
+    document.getElementById("not-authorised").hidden = !!cur || screens.length === 0;
+    currentScreen = cur ? cur.dataset.screen : currentScreen;
+    if (cur && cur.dataset.route) { activeRoute = cur.dataset.route; }
+    document.querySelectorAll("[data-goto-screen]").forEach(b => b.setAttribute("aria-pressed", String(!!cur && b.dataset.gotoScreen === cur.dataset.screen)));
+    renderNav(r);
+    document.dispatchEvent(new CustomEvent("pf:screen", { detail: currentScreen }));
+  }
+  function setRole(r) {
+    sel.value = r;
+    try { localStorage.setItem(KEY, r); } catch (e) { /* storage unavailable in file:// on some browsers */ }
+    document.getElementById("hdrs").textContent = "X-Actor-Id: " + ACTORS[r] + " · X-Actor-Role: " + r;
+    applyScreens();
+    document.dispatchEvent(new CustomEvent("pf:role", { detail: r }));
+  }
+  function gotoScreen(name) {
+    currentScreen = name;
+    const s = document.querySelector('.screen[data-screen="' + name + '"]');
+    if (s && !allowed(s, role())) { setRole(s.dataset.roles.split(" ")[0]); } else { applyScreens(); }
+  }
+  function setState(group, val) {
+    document.querySelectorAll("[data-when]").forEach(el => {
+      const conds = el.dataset.when.split(" ");
+      const mine = conds.filter(c => c.startsWith(group + ":"));
+      if (mine.length) el.hidden = !mine.includes(group + ":" + val);
+    });
+    document.querySelectorAll('[data-set-state^="' + group + ':"]').forEach(b => b.setAttribute("aria-pressed", String(b.dataset.setState === group + ":" + val)));
+    document.dispatchEvent(new CustomEvent("pf:state", { detail: { group, val } }));
+  }
+  function openNav() { nav.classList.add("open"); toggle.setAttribute("aria-expanded", "true"); const f = nav.querySelector("a"); if (f) f.focus(); }
+  function closeNav() { if (!nav.classList.contains("open")) return; nav.classList.remove("open"); toggle.setAttribute("aria-expanded", "false"); }
+  function fieldError(input, msg) {
+    const id = input.id + "-error";
+    let e = document.getElementById(id);
+    if (!msg) { input.removeAttribute("aria-invalid"); if (e) e.remove(); input.setAttribute("aria-describedby", (input.dataset.hintId || "")); return; }
+    if (!e) { e = document.createElement("p"); e.id = id; e.className = "err"; e.setAttribute("data-testid", "error-" + input.id); input.insertAdjacentElement("afterend", e); }
+    e.textContent = msg;
+    input.setAttribute("aria-invalid", "true");
+    input.setAttribute("aria-describedby", ((input.dataset.hintId || "") + " " + id).trim());
+  }
+  function init() {
+    toggle.addEventListener("click", () => nav.classList.contains("open") ? closeNav() : openNav());
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && nav.classList.contains("open")) { closeNav(); toggle.focus(); } });
+    sel.addEventListener("change", () => { setRole(sel.value); announce("Demo user switched to " + sel.options[sel.selectedIndex].text); });
+    document.querySelectorAll("[data-set-state]").forEach(b => b.addEventListener("click", () => { const [g, v] = b.dataset.setState.split(":"); setState(g, v); }));
+    document.querySelectorAll("[data-goto-screen]").forEach(b => b.addEventListener("click", () => gotoScreen(b.dataset.gotoScreen)));
+    window.addEventListener("hashchange", () => { const h = location.hash.replace("#", ""); if (h && document.querySelector('.screen[data-screen="' + h + '"]')) gotoScreen(h); });
+    const hash = location.hash.replace("#", "");
+    if (hash && document.querySelector('.screen[data-screen="' + hash + '"]')) currentScreen = hash;
+    let stored = null; try { stored = localStorage.getItem(KEY); } catch (e) { stored = null; }
+    let r = ACTORS[stored] ? stored : (window.PF_DEFAULT_ROLE || "CUSTOMER");
+    const want = currentScreen && document.querySelector('.screen[data-screen="' + currentScreen + '"]');
+    if (want && !allowed(want, r)) r = want.dataset.roles.split(" ")[0];
+    else if (!want && window.PF_DEFAULT_ROLE && !stored) r = window.PF_DEFAULT_ROLE;
+    setRole(r);
+    document.querySelectorAll("[data-set-state][data-default]").forEach(b => { const [g, v] = b.dataset.setState.split(":"); setState(g, v); });
+  }
+  return { inr, signedInr, uuid, role, headers, log, badge, badgeHtml, announce, setState, setRole, gotoScreen, fieldError, init, ACTORS };
+})();
+</script>
+<script>
+"use strict";
+/* ---------------- page script: E8-S3 ---------------- */
+window.PF_ACTIVE_ROUTE = "/policies";
+const $ = id => document.getElementById(id);
+const PN = "TL-2026-000001";
+const PREVIEWS = {
+  "2026-01-10": { refund_type: "FREE_LOOK", premium_paid: "12000.00", term_days: 365, days_elapsed: 9, unused_days: 356, admin_fee: "0.00", amount: "12000.00" },
+  "2026-04-01": { refund_type: "PRO_RATA", premium_paid: "12000.00", term_days: 365, days_elapsed: 90, unused_days: 275, admin_fee: "250.00", amount: "8791.10", pro_rata_amount: "9041.10" }
+};
+let pol = "ACTIVE"; let current = null; let timer = null;
+function sentence(p) {
+  if (p.refund_type === "FREE_LOOK") return "Full refund " + PF.inr(p.amount) + " (free-look)";
+  return "Refund " + PF.inr(p.amount) + " = " + PF.inr(p.pro_rata_amount) + " pro-rata for " + p.unused_days + " unused days − " + PF.inr(p.admin_fee) + " admin fee";
+}
+function refresh() {
+  const d = $("cancellation_date").value; $("api-date").textContent = d || "YYYY-MM-DD";
+  PF.fieldError($("cancellation_date"), null); $("form-alert").innerHTML = "";
+  const path = "/api/policies/" + PN + "/cancellation-preview?date=" + d;
+  $("pv-loading").hidden = false; $("pv").hidden = true;
+  clearTimeout(timer);
+  timer = setTimeout(() => {
+    $("pv-loading").hidden = true; $("pv").hidden = false; current = null;
+    if (pol === "CANCELLED") {
+      PF.log("GET", path, null, "409 INVALID_POLICY_STATE");
+      $("pv").innerHTML = '<div class="alert alert-error" role="alert"><p><strong class="code">409 INVALID_POLICY_STATE</strong> — this policy is already <strong>CANCELLED</strong>. <code>details: {"current": "CANCELLED", "target": "CANCELLED"}</code></p></div>'; return;
+    }
+    if (!d || d < "2026-01-01" || d > "2026-12-31") {
+      PF.log("GET", path, null, "422 VALIDATION_ERROR");
+      PF.fieldError($("cancellation_date"), "OUTSIDE_TERM — choose a date between 2026-01-01 and 2026-12-31");
+      $("pv").innerHTML = '<p class="small muted">No preview — the date is outside the policy term.</p>'; return;
+    }
+    const p = PREVIEWS[d];
+    PF.log("GET", path, null, "200" + (p ? " " + JSON.stringify(p) : ""));
+    if (!p) { $("pv").innerHTML = '<p class="small">Mockup: preview fixtures exist for 2026-01-10 and 2026-04-01; the backend computes every other date.</p>'; return; }
+    current = p;
+    $("pv").innerHTML = '<p class="refund-line" data-testid="refund-sentence">' + sentence(p) + "</p>" +
+      '<dl class="kv small"><dt>Refund type</dt><dd><code>' + p.refund_type + "</code></dd><dt>Premium paid</dt><dd class='num'>" + PF.inr(p.premium_paid) + "</dd>" +
+      "<dt>Days elapsed</dt><dd>" + p.days_elapsed + " of " + p.term_days + "</dd><dt>Unused days</dt><dd>" + p.unused_days + "</dd>" +
+      "<dt>Admin fee</dt><dd class='num'>" + PF.inr(p.admin_fee) + "</dd></dl>";
+  }, 250);
+}
+$("cancellation_date").addEventListener("change", refresh);
+$("cancellation_date").addEventListener("input", refresh);
+const dlg = $("confirm-dlg");
+$("cancel-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const d = $("cancellation_date").value;
+  if (pol === "CANCELLED") {
+    PF.log("POST", "/api/policies/" + PN + "/cancel", { cancellation_date: d, reason: $("reason").value }, "409 INVALID_POLICY_STATE");
+    $("form-alert").innerHTML = '<div class="alert alert-error" role="alert"><p><strong class="code">409 INVALID_POLICY_STATE</strong> — this policy is already CANCELLED.</p></div>'; return;
+  }
+  if (!d || d < "2026-01-01" || d > "2026-12-31") {
+    PF.log("POST", "/api/policies/" + PN + "/cancel", { cancellation_date: d, reason: $("reason").value }, "422 VALIDATION_ERROR");
+    PF.fieldError($("cancellation_date"), "OUTSIDE_TERM — choose a date between 2026-01-01 and 2026-12-31");
+    $("form-alert").innerHTML = '<div class="alert alert-error" role="alert"><p><strong class="code">422 VALIDATION_ERROR</strong> — <code>cancellation_date</code>: <code>OUTSIDE_TERM</code>.</p></div>';
+    $("cancellation_date").focus(); return;
+  }
+  $("dlg-date").textContent = d;
+  $("dlg-refund").textContent = current ? sentence(current) + "." : "Your refund is calculated by the system on confirmation.";
+  dlg.showModal();
+});
+dlg.addEventListener("close", () => {
+  if (dlg.returnValue !== "yes") return;
+  const d = $("cancellation_date").value; const body = { cancellation_date: d, reason: $("reason").value };
+  const p = current || PREVIEWS["2026-04-01"];
+  const resp = { policy_number: PN, status: "CANCELLED", refund: { refund_type: p.refund_type, amount: p.amount, admin_fee: p.admin_fee, unused_days: p.unused_days, cancellation_date: d } };
+  PF.log("POST", "/api/policies/" + PN + "/cancel", body, "200 " + JSON.stringify(resp));
+  $("done-msg").innerHTML = "<p>Policy cancelled. " + (p.refund_type === "FREE_LOOK" ? "Full refund " : "Refund ") + PF.inr(p.amount) + " recorded.</p>";
+  $("refund-rows").innerHTML = '<tr><td data-label="Cancellation date" class="num">' + d + '</td><td data-label="Type"><code>' + p.refund_type + '</code></td><td data-label="Unused days">' + p.unused_days + '</td><td data-label="Admin fee" class="num">' + PF.inr(p.admin_fee) + '</td><td data-label="Amount" class="num" data-testid="refund-amount">' + PF.inr(p.amount) + "</td></tr>";
+  $("done-lifecycle").innerHTML = "<li>Issued &rarr; " + PF.badgeHtml("ACTIVE") + '<br><span class="small muted">2026-01-01 09:12 · reason <code>ISSUED</code></span></li>' +
+    "<li>" + PF.badgeHtml("ACTIVE") + " &rarr; " + PF.badgeHtml("CANCELLED") + '<br><span class="small muted">' + d + " · reason <code>" + body.reason + "</code></span></li>";
+  pol = "CANCELLED"; $("pol-badge").innerHTML = PF.badgeHtml("CANCELLED");
+  PF.gotoScreen("done"); $("main").focus(); PF.announce("Policy cancelled. Status CANCELLED");
+});
+document.querySelectorAll("[data-date]").forEach(b => b.addEventListener("click", () => { PF.gotoScreen("cancel"); $("cancellation_date").value = b.dataset.date; refresh(); }));
+document.addEventListener("pf:state", e => { if (e.detail.group === "pol") { pol = e.detail.val; $("pol-badge").innerHTML = PF.badgeHtml(pol); PF.gotoScreen("cancel"); refresh(); } });
+PF.init();
+</script>
+</body>
+</html>
