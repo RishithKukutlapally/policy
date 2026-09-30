@@ -1,0 +1,147 @@
+{
+  "group": "S4",
+  "business_date": "2027-06-10",
+  "stories": ["E7-S1", "E7-S2", "E7-S3", "E7-S4", "E8-S1", "E8-S2", "E8-S3", "E9-S1", "E9-S2", "E9-S3", "E9-S4"],
+  "features": [
+    "F125", "F126", "F127", "F128", "F129", "F130", "F131", "F132", "F133", "F134",
+    "F135", "F136", "F137", "F138", "F139", "F140", "F141", "F142", "F143", "F144",
+    "F145", "F146", "F147", "F148", "F149", "F150", "F151", "F152", "F153", "F154",
+    "F155", "F156", "F157", "F158", "F159", "F160", "F161", "F162", "F163", "F164",
+    "F165", "F166", "F167", "F168", "F169", "F170", "F171", "F172", "F173", "F174",
+    "F175", "F176", "F177", "F178", "F179", "F180", "F181"
+  ],
+  "contract": {
+    "api_checks": [
+      {
+        "id": "S4-API-01",
+        "method": "GET",
+        "path": "/api/policies/{{policy_number}}/renewal",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "expected_status": 200,
+        "description": "AC-07 — renewal quote for the next term, priced on the active rule version"
+      },
+      {
+        "id": "S4-API-02",
+        "method": "POST",
+        "path": "/api/policies/{{policy_number}}/payments",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "body": { "amount": "23017.50" },
+        "expected_status": 201,
+        "description": "AC-17 — premium payment recorded append-only; a paid policy does not lapse"
+      },
+      {
+        "id": "S4-API-03",
+        "method": "POST",
+        "path": "/api/policies/{{policy_number}}/renew",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "expected_status": 201,
+        "expected_body": { "status": "ACTIVE" },
+        "description": "AC-07 — renewal issues a new-term policy linked by previous_policy_number; the old policy becomes RENEWED"
+      },
+      {
+        "id": "S4-API-04",
+        "method": "POST",
+        "path": "/api/admin/end-of-day",
+        "headers": { "X-Actor-Id": "admin-001", "X-Actor-Role": "ADMIN" },
+        "body": { "as_of": "2027-08-05" },
+        "expected_status": 200,
+        "expected_body": { "lapsed": 2 },
+        "description": "AC-07 / AC-18 — end-of-day lapses the two seeded policies whose renewal premium is unpaid past the grace period. 2027-08-05 is chosen because it does real work; a date where nothing is due would make the idempotency check below vacuous."
+      },
+      {
+        "id": "S4-API-05",
+        "method": "POST",
+        "path": "/api/admin/end-of-day",
+        "headers": { "X-Actor-Id": "admin-001", "X-Actor-Role": "ADMIN" },
+        "body": { "as_of": "2027-08-05" },
+        "expected_status": 200,
+        "expected_body": { "renewed": 0, "lapsed": 0 },
+        "description": "AC-18 — re-running the SAME date immediately after S4-API-04 must renew and lapse nothing a second time. Run this straight after S4-API-04 so the zero counts prove idempotency rather than an empty workload."
+      },
+      {
+        "id": "S4-API-06",
+        "method": "GET",
+        "path": "/api/policies/{{prorata_policy_number}}/cancellation-preview?date=2026-10-01",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "expected_status": 200,
+        "description": "AC-08 / AC-19 — pro-rated refund preview: premium × unused days ÷ term days − admin fee; the date is inside the term and past the 15-day free look"
+      },
+      {
+        "id": "S4-API-07",
+        "method": "POST",
+        "path": "/api/policies/{{free_look_policy_number}}/cancel",
+        "headers": { "X-Actor-Id": "cust-001", "X-Actor-Role": "CUSTOMER" },
+        "body": { "cancellation_date": "2026-07-05", "reason": "Vehicle sold" },
+        "expected_status": 200,
+        "expected_body": { "status": "CANCELLED" },
+        "description": "AC-08 / AC-19 — cancellation inside the free-look window of a new-business policy writes an append-only FREE_LOOK refund and moves the policy to CANCELLED (200, specs/renewal-cancellation_spec.md:152)"
+      },
+      {
+        "id": "S4-API-08",
+        "method": "GET",
+        "path": "/api/admin/portfolio?as_of=2026-10-15",
+        "headers": { "X-Actor-Id": "admin-001", "X-Actor-Role": "ADMIN" },
+        "expected_status": 200,
+        "description": "AC-20 — portfolio dashboard: active policies by product, premium collected, renewal pipeline, lapse forecast"
+      }
+    ],
+    "playwright_checks": [
+      {
+        "id": "S4-UI-01",
+        "description": "AC-07 / AC-17 — pay the renewal premium and renew the policy",
+        "url": "http://localhost:3000/policies",
+        "steps": [
+          { "action": "goto", "value": "http://localhost:3000/policies" },
+          { "action": "click", "selector": "[data-testid='policy-renew']" },
+          { "action": "click", "selector": "[data-testid='pay-premium']" },
+          { "action": "click", "selector": "[data-testid='renew-submit']" },
+          { "action": "expect_visible", "selector": "[data-testid='renewal-success']", "assertion": "successor policy number shown" }
+        ]
+      },
+      {
+        "id": "S4-UI-02",
+        "description": "AC-08 / AC-19 — cancellation preview shows the refund breakdown before confirming",
+        "url": "http://localhost:3000/policies",
+        "steps": [
+          { "action": "goto", "value": "http://localhost:3000/policies" },
+          { "action": "click", "selector": "[data-testid='policy-cancel']" },
+          { "action": "fill", "selector": "[data-testid='cancel-date']", "value": "2026-10-01" },
+          { "action": "expect_visible", "selector": "[data-testid='refund-preview']" },
+          { "action": "click", "selector": "[data-testid='cancel-confirm']" },
+          { "action": "expect_text", "selector": "[data-testid='policy-status']", "assertion": "CANCELLED" }
+        ]
+      },
+      {
+        "id": "S4-UI-03",
+        "description": "AC-20 / AC-24 — admin portfolio dashboard renders at desktop and mobile widths",
+        "url": "http://localhost:3000/admin/portfolio",
+        "steps": [
+          { "action": "goto", "value": "http://localhost:3000/admin/portfolio" },
+          { "action": "expect_visible", "selector": "[data-testid='portfolio-by-product']" },
+          { "action": "expect_visible", "selector": "[data-testid='renewal-pipeline']" },
+          { "action": "resize", "value": "390x844" },
+          { "action": "expect_visible", "selector": "[data-testid='portfolio-cards']", "assertion": "dashboard stacks on mobile" }
+        ]
+      }
+    ],
+    "design_checks": {
+      "visual_hierarchy": { "required": true, "min_score": 6 },
+      "accessibility": { "required": true, "min_score": 6 },
+      "responsiveness": { "required": true, "min_score": 6 },
+      "interaction_feedback": { "required": true, "min_score": 5 }
+    },
+    "performance_checks": [
+      { "endpoint": "/api/admin/portfolio", "method": "GET", "max_response_time_ms": 2000 },
+      { "endpoint": "/health", "method": "GET", "max_response_time_ms": 1000 }
+    ],
+    "architecture_checks": {
+      "layering": { "required": true, "description": "import-linter contracts KEPT; renewal_rules and refund_rules stay pure domain and take dates as arguments" },
+      "typing": { "required": true, "description": "mypy strict clean; zero any in the frontend" },
+      "folder_structure": { "required": true, "description": "matches specs/design/component-map.md rows for E7-*, E8-*, E9-*" },
+      "env_vars": { "required": true, "description": "end-of-day takes as_of explicitly; the business date comes only from the business_date setting via src/lib/clock.py" },
+      "migrations": { "required": true, "description": "single Alembic head; no new tables needed (E5-S2 created the lifecycle tables); no committed revision edited" }
+    }
+  },
+  "approved": true,
+  "notes": "Sprint 4 of 4. Delivers renewal with grace-period lapse (AC-07), simulated premium payments (AC-17), an idempotent end-of-day cycle (AC-18), cancellation with pro-rata and free-look refunds (AC-08, AC-19), the admin portfolio dashboard (AC-20), seed data with three products and sample policies (≥70% auto-bind), the README quick-start, and the Playwright end-to-end journeys with committed snapshots at 1280px and 390px (AC-24). Refunds, payments and transitions are append-only (NFR-02); every amount is Decimal quantized once (NFR-01). TDD: failing test before implementation for every story."
+}
